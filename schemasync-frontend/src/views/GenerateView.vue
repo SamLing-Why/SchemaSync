@@ -2,7 +2,7 @@
   <div class="generate-view">
     <el-card>
       <template #header>
-        <h2>DDL脚本生成</h2>
+        <h2>差异化DDL脚本生成</h2>
       </template>
 
       <el-form label-width="120px">

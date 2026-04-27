@@ -58,7 +58,7 @@ schemasync-frontend/
 │       ├── ConfigView.vue    # 数据源配置页面
 │       ├── ExportView.vue    # 数据字典导出页面
 │       ├── DiffView.vue      # 版本对比页面
-│       └── GenerateView.vue  # DDL脚本生成页面
+│       └── GenerateView.vue  # 差异化DDL脚本生成页面
 └── dist/                     # 构建产物
 ```
 
@@ -85,7 +85,7 @@ schemasync-frontend/
 - 查看差异统计
 - 下载差异报告
 
-### 4. DDL脚本生成 (`/generate`)
+### 4. 差异化DDL脚本生成 (`/generate`)
 
 - 上传两个版本的JSON文件
 - 配置生成选项

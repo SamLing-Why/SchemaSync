@@ -3,10 +3,13 @@ package com.schemasync.formatter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.schemasync.model.dict.FlatSchemaDictionary;
 import com.schemasync.model.dict.SchemaDictionary;
 import com.schemasync.model.diff.SchemaDiff;
+import com.schemasync.service.SchemaFlattener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,6 +24,9 @@ public class JsonFormatter {
     private static final Logger log = LoggerFactory.getLogger(JsonFormatter.class);
 
     private final ObjectMapper objectMapper;
+    
+    @Autowired
+    private SchemaFlattener schemaFlattener;
 
     public JsonFormatter() {
         this.objectMapper = new ObjectMapper();
@@ -30,14 +36,16 @@ public class JsonFormatter {
     }
 
     /**
-     * 将数据字典序列化为JSON字节数组
+     * 将数据字典序列化为JSON字节数组(扁平化结构,6个根节点)
      * 
      * @param dictionary 数据字典
      * @return JSON字节数组
      */
     public byte[] format(SchemaDictionary dictionary) {
         try {
-            return objectMapper.writeValueAsBytes(dictionary);
+            // 先扁平化数据
+            FlatSchemaDictionary flat = schemaFlattener.flatten(dictionary);
+            return objectMapper.writeValueAsBytes(flat);
         } catch (Exception e) {
             log.error("JSON序列化失败", e);
             throw new RuntimeException("JSON序列化失败", e);
@@ -60,11 +68,12 @@ public class JsonFormatter {
     }
 
     /**
-     * 将数据字典序列化为JSON字符串
+     * 将数据字典序列化为JSON字符串(扁平化结构,6个根节点)
      */
     public String formatToString(SchemaDictionary dictionary) {
         try {
-            return objectMapper.writeValueAsString(dictionary);
+            FlatSchemaDictionary flat = schemaFlattener.flatten(dictionary);
+            return objectMapper.writeValueAsString(flat);
         } catch (Exception e) {
             log.error("JSON序列化失败", e);
             throw new RuntimeException("JSON序列化失败", e);

@@ -26,6 +26,14 @@ export function deleteDataSource(id) {
 }
 
 // 测试数据源连接
-export function testConnection(configId) {
-  return request.post('/config/datasources/test', { configId })
+// 支持两种模式:
+// 1. 测试已保存的配置: testConnection(configId)
+// 2. 测试临时配置: testConnection(configObject)
+export function testConnection(config) {
+  // 如果传入的是字符串(配置ID),则测试已保存的配置
+  if (typeof config === 'string') {
+    return request.post('/config/datasources/test', { configId: config })
+  }
+  // 否则测试临时配置(新增/编辑时)
+  return request.post('/config/datasources/test', config)
 }

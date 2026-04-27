@@ -2,8 +2,7 @@ package com.schemasync.adapter;
 
 import com.schemasync.model.config.DataSourceConfig;
 import com.schemasync.model.dict.*;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import com.schemasync.util.ConnectionPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -93,17 +92,7 @@ public class OracleAdapter implements DatabaseAdapter {
 
     @Override
     public Connection connect(DataSourceConfig config) throws SQLException {
-        HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl(String.format("jdbc:oracle:thin:@%s:%d:%s",
-                config.getHost(), config.getPort(), config.getDatabase()));
-        hikariConfig.setUsername(config.getUsername());
-        hikariConfig.setPassword(config.getPassword());
-        hikariConfig.setDriverClassName("oracle.jdbc.OracleDriver");
-        hikariConfig.setMaximumPoolSize(5);
-        hikariConfig.setMinimumIdle(1);
-        hikariConfig.setConnectionTimeout(30000);
-        
-        return new HikariDataSource(hikariConfig).getConnection();
+        return ConnectionPoolManager.getConnection(config);
     }
 
     @Override

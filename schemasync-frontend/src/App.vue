@@ -34,6 +34,10 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('menu.generate') }}</span>
           </el-menu-item>
+          <el-menu-item index="/ddl">
+            <el-icon><Document /></el-icon>
+            <span>全量DDL脚本生成</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       

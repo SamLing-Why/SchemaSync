@@ -1,14 +1,11 @@
 package com.schemasync.model.dict;
 
-import lombok.Data;
-
 /**
  * 外键定义
  * 
  * @author SchemaSync Team
  * @since 2026-04-26
  */
-@Data
 public class ForeignKeyDefinition {
     
     /**
@@ -40,4 +37,17 @@ public class ForeignKeyDefinition {
      * 删除规则 (CASCADE, RESTRICT, SET NULL, NO ACTION)
      */
     private String onDelete;
+
+    public String getConstraintName() { return constraintName; }
+    public void setConstraintName(String constraintName) { this.constraintName = constraintName; }
+    public String getColumnName() { return columnName; }
+    public void setColumnName(String columnName) { this.columnName = columnName; }
+    public String getReferencedTable() { return referencedTable; }
+    public void setReferencedTable(String referencedTable) { this.referencedTable = referencedTable; }
+    public String getReferencedColumn() { return referencedColumn; }
+    public void setReferencedColumn(String referencedColumn) { this.referencedColumn = referencedColumn; }
+    public String getOnUpdate() { return onUpdate; }
+    public void setOnUpdate(String onUpdate) { this.onUpdate = onUpdate; }
+    public String getOnDelete() { return onDelete; }
+    public void setOnDelete(String onDelete) { this.onDelete = onDelete; }
 }

@@ -1,7 +1,6 @@
 package com.schemasync.model.dict;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import lombok.Data;
 
 import java.util.Date;
 
@@ -11,7 +10,6 @@ import java.util.Date;
  * @author SchemaSync Team
  * @since 2026-04-26
  */
-@Data
 public class ExportMetadata {
     
     /**
@@ -44,4 +42,17 @@ public class ExportMetadata {
      * 工具版本
      */
     private String toolVersion;
+
+    public Date getExportTime() { return exportTime; }
+    public void setExportTime(Date exportTime) { this.exportTime = exportTime; }
+    public String getDatabaseType() { return databaseType; }
+    public void setDatabaseType(String databaseType) { this.databaseType = databaseType; }
+    public String getDatabaseVersion() { return databaseVersion; }
+    public void setDatabaseVersion(String databaseVersion) { this.databaseVersion = databaseVersion; }
+    public String getDatabaseName() { return databaseName; }
+    public void setDatabaseName(String databaseName) { this.databaseName = databaseName; }
+    public String getSchemaName() { return schemaName; }
+    public void setSchemaName(String schemaName) { this.schemaName = schemaName; }
+    public String getToolVersion() { return toolVersion; }
+    public void setToolVersion(String toolVersion) { this.toolVersion = toolVersion; }
 }

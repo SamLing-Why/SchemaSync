@@ -116,7 +116,7 @@ POST /api/diff
 # multipart/form-data 上传两个数据字典文件
 ```
 
-### 3. DDL脚本生成
+### 3. 差异化DDL脚本生成
 
 ```bash
 POST /api/generate

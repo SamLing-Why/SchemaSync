@@ -51,7 +51,7 @@ const exporting = ref(false)
 const form = ref({
   configName: '',
   database: '',
-  format: 'json'
+  format: 'excel'  // 默认导出Excel
 })
 
 onMounted(() => {

@@ -30,7 +30,7 @@ export default {
     config: '数据源配置',
     export: '数据字典导出',
     diff: '版本对比',
-    generate: 'DDL脚本生成'
+    generate: '差异化DDL脚本生成'
   },
   config: {
     title: '数据源配置',
@@ -126,7 +126,7 @@ export default {
     }
   },
   generate: {
-    title: 'DDL脚本生成',
+    title: '差异化DDL脚本生成',
     subtitle: '根据差异生成DDL变更脚本',
     uploadDiff: '上传差异文件',
     options: '选项',

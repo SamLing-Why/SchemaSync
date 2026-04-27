@@ -34,15 +34,32 @@ logging:
 
 # SchemaSync自定义配置
 schemasync:
-  # 配置文件路径(相对于启动目录)
-  config-file: schemasync-config.json
-  # 默认输出目录
+  # 数据源配置文件路径
+  # 支持相对路径和绝对路径:
+  # - 相对路径: 相对于用户主目录 (~/.schemasync/)
+  # - 绝对路径: 以 / 或 C: 开头的完整路径
+  # 示例:
+  #   schemasync-config.json                    -> ~/.schemasync/schemasync-config.json
+  #   ./config/my-config.json                   -> ~/.schemasync/config/my-config.json
+  #   D:/configs/schemasync-config.json         -> D:/configs/schemasync-config.json
+  # config-file: schemasync-config.json  # 注释掉,使用代码默认值
+
+  # 默认输出目录(导出文件保存位置)
   default-output-dir: ./output
-  # 最大连接池大小
-  max-pool-size: 5
-  # 连接超时时间(毫秒)
-  connection-timeout: 30000
-  # 是否启用CLI
+
+  # 最大连接池大小(每个数据源)
+  max-pool-size: 10
+
+  # 连接超时时间(秒)
+  connection-timeout: 30
+
+  # 最小空闲连接数
+  min-idle: 2
+
+  # 连接最大存活时间(分钟)
+  max-lifetime: 30
+
+  # 是否启用CLI模式(保留,当前未使用)
   cli-enabled: true
 
 # Actuator配置

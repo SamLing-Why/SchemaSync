@@ -3,15 +3,14 @@ package com.schemasync.model.dict;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.util.Date;
-import java.util.List;
 
 /**
- * 表定义
+ * 表级别信息行
  * 
  * @author SchemaSync Team
- * @since 2026-04-26
+ * @since 2026-04-27
  */
-public class TableDefinition {
+public class TableInfoRow {
     
     /**
      * 表名
@@ -24,19 +23,9 @@ public class TableDefinition {
     private String tableComment;
     
     /**
-     * 表类型 (BASE TABLE, VIEW, TEMPORARY)
+     * 表类型(普通表/视图/临时表)
      */
     private String tableType;
-    
-    /**
-     * 存储引擎 (MySQL特有,如InnoDB)
-     */
-    private String engine;
-    
-    /**
-     * 字符集
-     */
-    private String charset;
     
     /**
      * 创建时间
@@ -51,19 +40,19 @@ public class TableDefinition {
     private Date updateTime;
     
     /**
-     * 字段列表
+     * 存储引擎(MySQL)
      */
-    private List<ColumnDefinition> columns;
+    private String engine;
     
     /**
-     * 索引列表
+     * 字符集
      */
-    private List<IndexDefinition> indexes;
+    private String charset;
     
     /**
-     * 外键列表
+     * 排序规则
      */
-    private List<ForeignKeyDefinition> foreignKeys;
+    private String collation;
 
     public String getTableName() { return tableName; }
     public void setTableName(String tableName) { this.tableName = tableName; }
@@ -71,18 +60,14 @@ public class TableDefinition {
     public void setTableComment(String tableComment) { this.tableComment = tableComment; }
     public String getTableType() { return tableType; }
     public void setTableType(String tableType) { this.tableType = tableType; }
-    public String getEngine() { return engine; }
-    public void setEngine(String engine) { this.engine = engine; }
-    public String getCharset() { return charset; }
-    public void setCharset(String charset) { this.charset = charset; }
     public Date getCreateTime() { return createTime; }
     public void setCreateTime(Date createTime) { this.createTime = createTime; }
     public Date getUpdateTime() { return updateTime; }
     public void setUpdateTime(Date updateTime) { this.updateTime = updateTime; }
-    public List<ColumnDefinition> getColumns() { return columns; }
-    public void setColumns(List<ColumnDefinition> columns) { this.columns = columns; }
-    public List<IndexDefinition> getIndexes() { return indexes; }
-    public void setIndexes(List<IndexDefinition> indexes) { this.indexes = indexes; }
-    public List<ForeignKeyDefinition> getForeignKeys() { return foreignKeys; }
-    public void setForeignKeys(List<ForeignKeyDefinition> foreignKeys) { this.foreignKeys = foreignKeys; }
+    public String getEngine() { return engine; }
+    public void setEngine(String engine) { this.engine = engine; }
+    public String getCharset() { return charset; }
+    public void setCharset(String charset) { this.charset = charset; }
+    public String getCollation() { return collation; }
+    public void setCollation(String collation) { this.collation = collation; }
 }

@@ -66,13 +66,48 @@ public class ConfigController {
 
     @PostMapping("/datasources/test")
     @Operation(summary = "测试数据源连接")
-    public ResponseEntity<Map<String, Object>> testConnection(@RequestBody Map<String, String> request) {
-        String configId = request.get("configId");
-        boolean success = configService.testConnection(configId);
+    public ResponseEntity<Map<String, Object>> testConnection(@RequestBody Map<String, Object> request) {
+        String configId = (String) request.get("configId");
         
-        return ResponseEntity.ok(Map.of(
+        // 支持两种模式:
+        // 1. 测试已保存的配置(传入configId)
+        // 2. 测试临时配置(传入完整配置对象)
+        
+        if (configId != null && !configId.trim().isEmpty()) {
+            // 模式1: 测试已保存的配置
+            boolean success = configService.testConnection(configId);
+            return ResponseEntity.ok(Map.of(
                 "success", success,
                 "message", success ? "连接成功" : "连接失败"
-        ));
+            ));
+        } else {
+            // 模式2: 测试临时配置(新增/编辑时)
+            DataSourceConfig tempConfig = new DataSourceConfig();
+            tempConfig.setType((String) request.get("type"));
+            tempConfig.setHost((String) request.get("host"));
+            
+            // 端口处理
+            Object portObj = request.get("port");
+            if (portObj != null) {
+                tempConfig.setPort(portObj instanceof Integer ? (Integer) portObj : Integer.parseInt(portObj.toString()));
+            }
+            
+            tempConfig.setDatabase((String) request.get("database"));
+            tempConfig.setUsername((String) request.get("username"));
+            tempConfig.setPassword((String) request.get("password"));
+            
+            // 可选字段
+            tempConfig.setJdbcUrl((String) request.get("jdbcUrl"));
+            tempConfig.setPoolConfig((String) request.get("poolConfig"));
+            
+            Object timeoutObj = request.get("timeout");
+            if (timeoutObj != null) {
+                tempConfig.setTimeout(timeoutObj instanceof Integer ? (Integer) timeoutObj : Integer.parseInt(timeoutObj.toString()));
+            }
+            
+            // 测试连接
+            Map<String, Object> result = configService.testConnectionWithConfig(tempConfig);
+            return ResponseEntity.ok(result);
+        }
     }
 }

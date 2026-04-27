@@ -1,14 +1,17 @@
 package com.schemasync.model.dict;
 
-import java.util.List;
-
 /**
- * 索引定义
+ * 索引信息行
  * 
  * @author SchemaSync Team
- * @since 2026-04-26
+ * @since 2026-04-27
  */
-public class IndexDefinition {
+public class IndexInfoRow {
+    
+    /**
+     * 表名
+     */
+    private String tableName;
     
     /**
      * 索引名称
@@ -16,33 +19,28 @@ public class IndexDefinition {
     private String indexName;
     
     /**
-     * 索引类型 (PRIMARY, UNIQUE, INDEX, FULLTEXT)
+     * 索引类型(主键/唯一/普通/全文)
      */
     private String indexType;
     
     /**
-     * 索引字段列表
+     * 索引字段及顺序(逗号分隔)
      */
-    private List<String> columns;
-    
-    /**
-     * 是否唯一索引
-     */
-    private Boolean isUnique;
+    private String columns;
     
     /**
      * 索引备注
      */
     private String comment;
 
+    public String getTableName() { return tableName; }
+    public void setTableName(String tableName) { this.tableName = tableName; }
     public String getIndexName() { return indexName; }
     public void setIndexName(String indexName) { this.indexName = indexName; }
     public String getIndexType() { return indexType; }
     public void setIndexType(String indexType) { this.indexType = indexType; }
-    public List<String> getColumns() { return columns; }
-    public void setColumns(List<String> columns) { this.columns = columns; }
-    public Boolean getIsUnique() { return isUnique; }
-    public void setIsUnique(Boolean isUnique) { this.isUnique = isUnique; }
+    public String getColumns() { return columns; }
+    public void setColumns(String columns) { this.columns = columns; }
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
 }

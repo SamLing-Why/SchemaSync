@@ -2,8 +2,7 @@ package com.schemasync.adapter;
 
 import com.schemasync.model.config.DataSourceConfig;
 import com.schemasync.model.dict.*;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import com.schemasync.util.ConnectionPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -58,15 +57,7 @@ public class MySQLAdapter implements DatabaseAdapter {
 
     @Override
     public Connection connect(DataSourceConfig config) throws SQLException {
-        HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl(buildJdbcUrl(config));
-        hikariConfig.setUsername(config.getUsername());
-        hikariConfig.setPassword(config.getPassword());
-        hikariConfig.setMaximumPoolSize(5);
-        hikariConfig.setMinimumIdle(1);
-        hikariConfig.setConnectionTimeout(config.getTimeout() * 1000L);
-        
-        return new HikariDataSource(hikariConfig).getConnection();
+        return ConnectionPoolManager.getConnection(config);
     }
 
     @Override

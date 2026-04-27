@@ -33,6 +33,14 @@ public class ExportController {
             @RequestParam(required = false) String tablePattern,
             @RequestParam(required = false) String excludeTables) {
         
+        // 参数校验
+        if (configName == null || configName.trim().isEmpty()) {
+            throw new IllegalArgumentException("数据源配置名称不能为空");
+        }
+        if (database == null || database.trim().isEmpty()) {
+            throw new IllegalArgumentException("数据库名称不能为空");
+        }
+        
         // 构建导出选项
         ExportOptions options = ExportOptions.builder()
                 .format(format)

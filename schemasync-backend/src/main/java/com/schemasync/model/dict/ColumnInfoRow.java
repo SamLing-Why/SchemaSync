@@ -1,12 +1,17 @@
 package com.schemasync.model.dict;
 
 /**
- * 字段定义 - 数据类型、长度、精度分离
+ * 字段级别信息行
  * 
  * @author SchemaSync Team
- * @since 2026-04-26
+ * @since 2026-04-27
  */
-public class ColumnDefinition {
+public class ColumnInfoRow {
+    
+    /**
+     * 表名
+     */
+    private String tableName;
     
     /**
      * 字段名称
@@ -14,24 +19,19 @@ public class ColumnDefinition {
     private String columnName;
     
     /**
-     * 数据类型(不含长度精度),如VARCHAR,DECIMAL,BIGINT
+     * 数据类型(不含长度、精度)
      */
     private String dataType;
     
     /**
-     * 长度,字符串类型使用,如VARCHAR(100)的100
+     * 长度
      */
     private Integer length;
     
     /**
-     * 精度,数值型字段总位数,如DECIMAL(10,2)的10
+     * 精度(数值型字段)
      */
     private Integer precision;
-    
-    /**
-     * 小数位数,如DECIMAL(10,2)的2
-     */
-    private Integer scale;
     
     /**
      * 是否允许NULL
@@ -62,12 +62,9 @@ public class ColumnDefinition {
      * 字符集(字段级别)
      */
     private String charset;
-    
-    /**
-     * 字段位置
-     */
-    private Integer ordinalPosition;
 
+    public String getTableName() { return tableName; }
+    public void setTableName(String tableName) { this.tableName = tableName; }
     public String getColumnName() { return columnName; }
     public void setColumnName(String columnName) { this.columnName = columnName; }
     public String getDataType() { return dataType; }
@@ -76,8 +73,6 @@ public class ColumnDefinition {
     public void setLength(Integer length) { this.length = length; }
     public Integer getPrecision() { return precision; }
     public void setPrecision(Integer precision) { this.precision = precision; }
-    public Integer getScale() { return scale; }
-    public void setScale(Integer scale) { this.scale = scale; }
     public Boolean getNullable() { return nullable; }
     public void setNullable(Boolean nullable) { this.nullable = nullable; }
     public Object getDefaultValue() { return defaultValue; }
@@ -90,6 +85,4 @@ public class ColumnDefinition {
     public void setComment(String comment) { this.comment = comment; }
     public String getCharset() { return charset; }
     public void setCharset(String charset) { this.charset = charset; }
-    public Integer getOrdinalPosition() { return ordinalPosition; }
-    public void setOrdinalPosition(Integer ordinalPosition) { this.ordinalPosition = ordinalPosition; }
 }

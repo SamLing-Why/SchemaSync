@@ -11,12 +11,12 @@
             ref="oldUpload"
             :auto-upload="false"
             :limit="1"
-            accept=".json"
+            accept=".json,.xlsx,.xls"
             @change="handleOldFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择旧版本数据字典JSON文件</div>
+              <div class="el-upload__tip">请选择旧版本数据字典文件(JSON或Excel)</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -26,12 +26,12 @@
             ref="newUpload"
             :auto-upload="false"
             :limit="1"
-            accept=".json"
+            accept=".json,.xlsx,.xls"
             @change="handleNewFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择新版本数据字典JSON文件</div>
+              <div class="el-upload__tip">请选择新版本数据字典文件(JSON或Excel)</div>
             </template>
           </el-upload>
         </el-form-item>

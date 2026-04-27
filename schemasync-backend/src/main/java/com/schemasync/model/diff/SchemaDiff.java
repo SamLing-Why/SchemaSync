@@ -1,7 +1,5 @@
 package com.schemasync.model.diff;
 
-import lombok.Data;
-
 import java.util.List;
 
 /**
@@ -10,7 +8,6 @@ import java.util.List;
  * @author SchemaSync Team
  * @since 2026-04-26
  */
-@Data
 public class SchemaDiff {
     
     /**
@@ -27,4 +24,11 @@ public class SchemaDiff {
      * 变更列表
      */
     private List<SchemaChange> changes;
+
+    public DiffMetadata getDiffMetadata() { return diffMetadata; }
+    public void setDiffMetadata(DiffMetadata diffMetadata) { this.diffMetadata = diffMetadata; }
+    public DiffSummary getSummary() { return summary; }
+    public void setSummary(DiffSummary summary) { this.summary = summary; }
+    public List<SchemaChange> getChanges() { return changes; }
+    public void setChanges(List<SchemaChange> changes) { this.changes = changes; }
 }

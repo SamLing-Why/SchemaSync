@@ -775,7 +775,7 @@ POST   /api/diff                        # 对比两个数据字典
        }
 ```
 
-#### 4.1.4 DDL脚本生成
+#### 4.1.4 差异化DDL脚本生成
 
 ```
 POST   /api/generate                    # 生成DDL脚本
@@ -1494,7 +1494,7 @@ docker run -d -p 8080:8080 -v /data/config:/app/config schemasync:latest
 - [ ] 数据字典导出功能
 - [ ] JSON/Excel格式化
 - [ ] 差异对比引擎
-- [ ] DDL脚本生成
+- [ ] 差异化DDL脚本生成
 - [ ] 单元测试
 
 **交付物**:

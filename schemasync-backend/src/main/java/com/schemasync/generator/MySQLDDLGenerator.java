@@ -63,7 +63,7 @@ public class MySQLDDLGenerator implements DDLGenerator {
         ddl.append("-- 3. 检查应用功能是否正常\n");
         ddl.append("-- ============================================\n");
 
-        log.info("DDL脚本生成完成, 长度: {} 字符", ddl.length());
+        log.info("差异化DDL脚本生成完成, 长度: {} 字符", ddl.length());
         return ddl.toString();
     }
 

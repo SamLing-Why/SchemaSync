@@ -1,7 +1,5 @@
 package com.schemasync.model.dict;
 
-import lombok.Data;
-
 import java.util.List;
 
 /**
@@ -10,7 +8,6 @@ import java.util.List;
  * @author SchemaSync Team
  * @since 2026-04-26
  */
-@Data
 public class SchemaDictionary {
     
     /**
@@ -22,4 +19,9 @@ public class SchemaDictionary {
      * 表定义列表
      */
     private List<TableDefinition> tables;
+
+    public ExportMetadata getMetadata() { return metadata; }
+    public void setMetadata(ExportMetadata metadata) { this.metadata = metadata; }
+    public List<TableDefinition> getTables() { return tables; }
+    public void setTables(List<TableDefinition> tables) { this.tables = tables; }
 }

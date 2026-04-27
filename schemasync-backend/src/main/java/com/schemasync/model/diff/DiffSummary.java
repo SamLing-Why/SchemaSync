@@ -1,14 +1,11 @@
 package com.schemasync.model.diff;
 
-import lombok.Data;
-
 /**
  * 差异统计
  * 
  * @author SchemaSync Team
  * @since 2026-04-26
  */
-@Data
 public class DiffSummary {
     
     /** 新增表数量 */
@@ -43,4 +40,27 @@ public class DiffSummary {
     
     /** 破坏性变更数量 */
     private Integer breakingChanges;
+
+    public Integer getTablesAdded() { return tablesAdded; }
+    public void setTablesAdded(Integer tablesAdded) { this.tablesAdded = tablesAdded; }
+    public Integer getTablesDropped() { return tablesDropped; }
+    public void setTablesDropped(Integer tablesDropped) { this.tablesDropped = tablesDropped; }
+    public Integer getTablesModified() { return tablesModified; }
+    public void setTablesModified(Integer tablesModified) { this.tablesModified = tablesModified; }
+    public Integer getColumnsAdded() { return columnsAdded; }
+    public void setColumnsAdded(Integer columnsAdded) { this.columnsAdded = columnsAdded; }
+    public Integer getColumnsDropped() { return columnsDropped; }
+    public void setColumnsDropped(Integer columnsDropped) { this.columnsDropped = columnsDropped; }
+    public Integer getColumnsModified() { return columnsModified; }
+    public void setColumnsModified(Integer columnsModified) { this.columnsModified = columnsModified; }
+    public Integer getIndexesAdded() { return indexesAdded; }
+    public void setIndexesAdded(Integer indexesAdded) { this.indexesAdded = indexesAdded; }
+    public Integer getIndexesDropped() { return indexesDropped; }
+    public void setIndexesDropped(Integer indexesDropped) { this.indexesDropped = indexesDropped; }
+    public Integer getForeignKeysAdded() { return foreignKeysAdded; }
+    public void setForeignKeysAdded(Integer foreignKeysAdded) { this.foreignKeysAdded = foreignKeysAdded; }
+    public Integer getForeignKeysDropped() { return foreignKeysDropped; }
+    public void setForeignKeysDropped(Integer foreignKeysDropped) { this.foreignKeysDropped = foreignKeysDropped; }
+    public Integer getBreakingChanges() { return breakingChanges; }
+    public void setBreakingChanges(Integer breakingChanges) { this.breakingChanges = breakingChanges; }
 }

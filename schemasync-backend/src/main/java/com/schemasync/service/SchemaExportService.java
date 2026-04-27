@@ -43,6 +43,21 @@ public class SchemaExportService {
      * @return 数据字典文件的字节数组
      */
     public byte[] exportSchema(String configName, ExportOptions options) {
+        if (configName == null || configName.trim().isEmpty()) {
+            throw new IllegalArgumentException("数据源配置名称不能为空");
+        }
+        if (options == null) {
+            throw new IllegalArgumentException("导出选项不能为空");
+        }
+        if (options.getDatabase() == null || options.getDatabase().trim().isEmpty()) {
+            throw new IllegalArgumentException("数据库名称不能为空");
+        }
+        
+        // 设置默认值
+        if (options.getFormat() == null || options.getFormat().trim().isEmpty()) {
+            options.setFormat("excel");  // 默认导出Excel
+        }
+        
         log.info("开始导出数据字典, 配置: {}, 数据库: {}", configName, options.getDatabase());
 
         // 1. 获取数据源配置
