@@ -1,0 +1,11 @@
+# 生产环境配置
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: WARN
+    com.schemasync: INFO
+  file:
+    name: /var/log/schemasync/schemasync.log

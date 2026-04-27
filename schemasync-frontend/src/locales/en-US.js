@@ -1,0 +1,148 @@
+// English Language Pack
+export default {
+  common: {
+    appName: 'SchemaSync',
+    appSubtitle: 'Lightweight Data Dictionary Management Tool',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    save: 'Save',
+    delete: 'Delete',
+    edit: 'Edit',
+    add: 'Add',
+    search: 'Search',
+    reset: 'Reset',
+    loading: 'Loading...',
+    success: 'Success',
+    error: 'Error',
+    warning: 'Warning',
+    info: 'Info',
+    operation: 'Operation',
+    actions: 'Actions',
+    back: 'Back',
+    download: 'Download',
+    upload: 'Upload',
+    test: 'Test',
+    close: 'Close',
+    yes: 'Yes',
+    no: 'No'
+  },
+  menu: {
+    config: 'Data Source Config',
+    export: 'Export Dictionary',
+    diff: 'Version Diff',
+    generate: 'Generate DDL'
+  },
+  config: {
+    title: 'Data Source Configuration',
+    subtitle: 'Manage database connection configurations',
+    addDataSource: 'Add Data Source',
+    editDataSource: 'Edit Data Source',
+    deleteConfirm: 'Are you sure to delete data source "{name}"?',
+    testSuccess: 'Connection test successful',
+    testFailed: 'Connection test failed',
+    saveSuccess: 'Saved successfully',
+    saveFailed: 'Save failed',
+    deleteSuccess: 'Deleted successfully',
+    deleteFailed: 'Delete failed',
+    loadFailed: 'Failed to load data sources',
+    form: {
+      name: 'Config Name',
+      namePlaceholder: 'Enter config name',
+      type: 'Database Type',
+      typePlaceholder: 'Select database type',
+      host: 'Host',
+      hostPlaceholder: 'Enter host address',
+      port: 'Port',
+      portPlaceholder: 'Enter port number',
+      database: 'Database',
+      databasePlaceholder: 'Enter database name',
+      username: 'Username',
+      usernamePlaceholder: 'Enter username',
+      password: 'Password',
+      passwordPlaceholder: 'Enter password',
+      timeout: 'Timeout (seconds)',
+      timeoutPlaceholder: 'Enter timeout'
+    },
+    dbTypes: {
+      mysql: 'MySQL',
+      oracle: 'Oracle',
+      oceanbase: 'OceanBase',
+      tdsql: 'TDSQL',
+      gaussdb: 'GaussDB',
+      goldendb: 'GoldenDB'
+    }
+  },
+  export: {
+    title: 'Export Data Dictionary',
+    subtitle: 'Export database schema information',
+    form: {
+      dataSource: 'Data Source',
+      dataSourcePlaceholder: 'Select data source',
+      database: 'Database Name',
+      databasePlaceholder: 'Enter database name',
+      format: 'Export Format',
+      includeIndexes: 'Include Indexes',
+      includeForeignKeys: 'Include Foreign Keys',
+      tablePattern: 'Table Pattern',
+      tablePatternPlaceholder: 'e.g., user_% (optional)',
+      excludeTables: 'Exclude Tables',
+      excludeTablesPlaceholder: 'e.g., table1,table2 (optional)'
+    },
+    exportSuccess: 'Export successful',
+    exportFailed: 'Export failed',
+    loadFailed: 'Failed to load data sources'
+  },
+  diff: {
+    title: 'Version Diff',
+    subtitle: 'Compare differences between two dictionary versions',
+    oldFile: 'Old Version File',
+    newFile: 'New Version File',
+    selectFile: 'Select File',
+    startCompare: 'Start Compare',
+    comparing: 'Comparing...',
+    compareSuccess: 'Compare completed',
+    compareFailed: 'Compare failed',
+    selectTwoFiles: 'Please select two files',
+    summary: {
+      title: 'Diff Summary',
+      totalChanges: 'Total Changes',
+      breakingChanges: 'Breaking Changes',
+      tableChanges: 'Table Changes',
+      columnChanges: 'Column Changes',
+      indexChanges: 'Index Changes',
+      fkChanges: 'Foreign Key Changes'
+    },
+    changeTypes: {
+      TABLE_ADD: 'Add Table',
+      TABLE_DROP: 'Drop Table',
+      TABLE_MODIFY: 'Modify Table',
+      COLUMN_ADD: 'Add Column',
+      COLUMN_DROP: 'Drop Column',
+      COLUMN_MODIFY: 'Modify Column',
+      INDEX_ADD: 'Add Index',
+      INDEX_DROP: 'Drop Index',
+      FOREIGN_KEY_ADD: 'Add Foreign Key',
+      FOREIGN_KEY_DROP: 'Drop Foreign Key'
+    }
+  },
+  generate: {
+    title: 'Generate DDL Script',
+    subtitle: 'Generate DDL change script based on diff',
+    uploadDiff: 'Upload Diff File',
+    options: 'Options',
+    includeRollback: 'Include Rollback Script',
+    commentBreaking: 'Comment Breaking Changes',
+    useTransaction: 'Use Transaction',
+    generate: 'Generate Script',
+    generating: 'Generating...',
+    generateSuccess: 'Generated successfully',
+    generateFailed: 'Generate failed',
+    preview: 'Script Preview',
+    download: 'Download Script',
+    noScript: 'Please generate script first'
+  },
+  footer: {
+    copyright: 'SchemaSync v1.0.0 © 2026',
+    poweredBy: 'Powered by Spring Boot + Vue 3'
+  }
+}

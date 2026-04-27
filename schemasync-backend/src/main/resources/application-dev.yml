@@ -1,0 +1,7 @@
+# 开发环境配置
+
+logging:
+  level:
+    root: INFO
+    com.schemasync: DEBUG
+    org.springframework.web: DEBUG

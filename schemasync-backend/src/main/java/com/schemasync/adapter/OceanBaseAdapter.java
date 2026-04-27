@@ -1,0 +1,296 @@
+package com.schemasync.adapter;
+
+import com.schemasync.model.config.DataSourceConfig;
+import com.schemasync.model.dict.*;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * OceanBase数据库适配器
+ * OceanBase兼容MySQL协议,使用MySQL驱动连接
+ * 
+ * @author SchemaSync Team
+ * @since 2026-04-26
+ */
+@Component
+public class OceanBaseAdapter implements DatabaseAdapter {
+
+    private static final Logger log = LoggerFactory.getLogger(OceanBaseAdapter.class);
+
+    // OceanBase使用MySQL兼容模式,查询与MySQL相同
+    private static final String QUERY_TABLES = 
+        "SELECT TABLE_NAME, TABLE_COMMENT, TABLE_TYPE, ENGINE, TABLE_COLLATION, CREATE_TIME, UPDATE_TIME " +
+        "FROM INFORMATION_SCHEMA.TABLES " +
+        "WHERE TABLE_SCHEMA = ? AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') " +
+        "ORDER BY TABLE_NAME";
+
+    private static final String QUERY_COLUMNS = 
+        "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, " +
+        "NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE, COLUMN_DEFAULT, " +
+        "COLUMN_KEY, EXTRA, COLUMN_COMMENT, CHARACTER_SET_NAME, ORDINAL_POSITION " +
+        "FROM INFORMATION_SCHEMA.COLUMNS " +
+        "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? " +
+        "ORDER BY ORDINAL_POSITION";
+
+    private static final String QUERY_INDEXES = 
+        "SELECT INDEX_NAME, NON_UNIQUE, INDEX_TYPE, " +
+        "GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) as COLUMNS " +
+        "FROM INFORMATION_SCHEMA.STATISTICS " +
+        "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? " +
+        "GROUP BY INDEX_NAME, NON_UNIQUE, INDEX_TYPE";
+
+    private static final String QUERY_FOREIGN_KEYS = 
+        "SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME " +
+        "FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+        "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL";
+
+    @Override
+    public String getDatabaseType() {
+        return "OCEANBASE";
+    }
+
+    @Override
+    public List<String> getDatabases(Connection conn) throws SQLException {
+        List<String> databases = new ArrayList<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SHOW DATABASES")) {
+            while (rs.next()) {
+                String dbName = rs.getString(1);
+                // 排除系统数据库
+                if (!dbName.equals("information_schema") && 
+                    !dbName.equals("mysql") && 
+                    !dbName.equals("performance_schema") &&
+                    !dbName.equals("sys") &&
+                    !dbName.equals("oceanbase")) {
+                    databases.add(dbName);
+                }
+            }
+        }
+        return databases;
+    }
+
+    @Override
+    public String getDatabaseVersion(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT VERSION()")) {
+            if (rs.next()) {
+                return "OceanBase " + rs.getString(1);
+            }
+        }
+        return "OceanBase Unknown";
+    }
+
+    @Override
+    public Connection connect(DataSourceConfig config) throws SQLException {
+        HikariConfig hikariConfig = new HikariConfig();
+        // OceanBase兼容MySQL协议,使用MySQL JDBC URL格式
+        hikariConfig.setJdbcUrl(String.format(
+            "jdbc:mysql://%s:%d/%s?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai",
+            config.getHost(), 
+            config.getPort(), 
+            config.getDatabase()
+        ));
+        hikariConfig.setUsername(config.getUsername());
+        hikariConfig.setPassword(config.getPassword());
+        // OceanBase使用MySQL驱动
+        hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        hikariConfig.setMaximumPoolSize(5);
+        hikariConfig.setMinimumIdle(1);
+        hikariConfig.setConnectionTimeout(config.getTimeout() * 1000L);
+        
+        return new HikariDataSource(hikariConfig).getConnection();
+    }
+
+    @Override
+    public boolean testConnection(DataSourceConfig config) {
+        try (Connection conn = connect(config)) {
+            return conn != null && !conn.isClosed();
+        } catch (Exception e) {
+            log.error("OceanBase连接测试失败", e);
+            return false;
+        }
+    }
+
+    @Override
+    public SchemaDictionary exportSchema(DataSourceConfig config, ExportOptions options) throws SQLException {
+        SchemaDictionary dictionary = new SchemaDictionary();
+        
+        // 设置元数据
+        ExportMetadata metadata = new ExportMetadata();
+        metadata.setExportTime(new Date());
+        metadata.setDatabaseType("OceanBase");
+        metadata.setDatabaseName(options.getDatabase());
+        dictionary.setMetadata(metadata);
+        
+        try (Connection conn = connect(config)) {
+            // 获取所有表
+            List<TableDefinition> tables = getTables(conn, options.getDatabase());
+            
+            // 过滤表
+            if (options.getTablePattern() != null) {
+                String pattern = options.getTablePattern().replace("%", ".*");
+                tables.removeIf(t -> !t.getTableName().matches(pattern));
+            }
+            
+            // 排除表
+            if (options.getExcludeTables() != null && !options.getExcludeTables().isEmpty()) {
+                tables.removeIf(t -> options.getExcludeTables().contains(t.getTableName()));
+            }
+            
+            // 导出每个表的详细信息
+            for (TableDefinition table : tables) {
+                table.setColumns(getColumns(conn, options.getDatabase(), table.getTableName()));
+                
+                if (options.getIncludeIndexes()) {
+                    table.setIndexes(getIndexes(conn, options.getDatabase(), table.getTableName()));
+                }
+                
+                if (options.getIncludeForeignKeys()) {
+                    table.setForeignKeys(getForeignKeys(conn, options.getDatabase(), table.getTableName()));
+                }
+            }
+            
+            dictionary.setTables(tables);
+        }
+        
+        return dictionary;
+    }
+
+    @Override
+    public List<TableDefinition> getTables(Connection conn, String database) throws SQLException {
+        List<TableDefinition> tables = new ArrayList<>();
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(QUERY_TABLES)) {
+            pstmt.setString(1, database);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    TableDefinition table = new TableDefinition();
+                    table.setTableName(rs.getString("TABLE_NAME"));
+                    table.setTableComment(rs.getString("TABLE_COMMENT"));
+                    tables.add(table);
+                }
+            }
+        }
+        
+        return tables;
+    }
+
+    @Override
+    public List<ColumnDefinition> getColumns(Connection conn, String database, String tableName) throws SQLException {
+        List<ColumnDefinition> columns = new ArrayList<>();
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(QUERY_COLUMNS)) {
+            pstmt.setString(1, database);
+            pstmt.setString(2, tableName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    ColumnDefinition column = new ColumnDefinition();
+                    column.setColumnName(rs.getString("COLUMN_NAME"));
+                    column.setDataType(rs.getString("DATA_TYPE"));
+                    
+                    // 长度
+                    int length = rs.getInt("CHARACTER_MAXIMUM_LENGTH");
+                    if (!rs.wasNull()) {
+                        column.setLength(length);
+                    }
+                    
+                    // 精度
+                    int precision = rs.getInt("NUMERIC_PRECISION");
+                    if (!rs.wasNull()) {
+                        column.setPrecision(precision);
+                    }
+                    
+                    // 小数位
+                    int scale = rs.getInt("NUMERIC_SCALE");
+                    if (!rs.wasNull()) {
+                        column.setScale(scale);
+                    }
+                    
+                    column.setNullable("YES".equals(rs.getString("IS_NULLABLE")));
+                    
+                    String defaultValue = rs.getString("COLUMN_DEFAULT");
+                    if (defaultValue != null) {
+                        column.setDefaultValue(defaultValue);
+                    }
+                    
+                    // 主键
+                    String columnKey = rs.getString("COLUMN_KEY");
+                    column.setIsPrimaryKey("PRI".equals(columnKey));
+                    
+                    // 自增
+                    String extra = rs.getString("EXTRA");
+                    column.setIsAutoIncrement(extra != null && extra.contains("auto_increment"));
+                    
+                    column.setComment(rs.getString("COLUMN_COMMENT"));
+                    column.setOrdinalPosition(rs.getInt("ORDINAL_POSITION"));
+                    
+                    columns.add(column);
+                }
+            }
+        }
+        
+        return columns;
+    }
+
+    @Override
+    public List<IndexDefinition> getIndexes(Connection conn, String database, String tableName) throws SQLException {
+        List<IndexDefinition> indexes = new ArrayList<>();
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(QUERY_INDEXES)) {
+            pstmt.setString(1, database);
+            pstmt.setString(2, tableName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    IndexDefinition index = new IndexDefinition();
+                    index.setIndexName(rs.getString("INDEX_NAME"));
+                    index.setIndexType(rs.getString("INDEX_TYPE"));
+                    index.setIsUnique(rs.getInt("NON_UNIQUE") == 0);
+                    
+                    String columnsStr = rs.getString("COLUMNS");
+                    if (columnsStr != null) {
+                        index.setColumns(Arrays.asList(columnsStr.split(",")));
+                    }
+                    
+                    indexes.add(index);
+                }
+            }
+        }
+        
+        return indexes;
+    }
+
+    @Override
+    public List<ForeignKeyDefinition> getForeignKeys(Connection conn, String database, String tableName) throws SQLException {
+        List<ForeignKeyDefinition> foreignKeys = new ArrayList<>();
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(QUERY_FOREIGN_KEYS)) {
+            pstmt.setString(1, database);
+            pstmt.setString(2, tableName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    ForeignKeyDefinition fk = new ForeignKeyDefinition();
+                    fk.setConstraintName(rs.getString("CONSTRAINT_NAME"));
+                    fk.setColumnName(rs.getString("COLUMN_NAME"));
+                    fk.setReferencedTable(rs.getString("REFERENCED_TABLE_NAME"));
+                    fk.setReferencedColumn(rs.getString("REFERENCED_COLUMN_NAME"));
+                    foreignKeys.add(fk);
+                }
+            }
+        }
+        
+        return foreignKeys;
+    }
+}

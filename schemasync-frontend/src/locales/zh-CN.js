@@ -1,0 +1,148 @@
+// 中文语言包
+export default {
+  common: {
+    appName: 'SchemaSync',
+    appSubtitle: '轻量级数据字典管理工具',
+    confirm: '确定',
+    cancel: '取消',
+    save: '保存',
+    delete: '删除',
+    edit: '编辑',
+    add: '新增',
+    search: '搜索',
+    reset: '重置',
+    loading: '加载中...',
+    success: '成功',
+    error: '错误',
+    warning: '警告',
+    info: '提示',
+    operation: '操作',
+    actions: '操作',
+    back: '返回',
+    download: '下载',
+    upload: '上传',
+    test: '测试',
+    close: '关闭',
+    yes: '是',
+    no: '否'
+  },
+  menu: {
+    config: '数据源配置',
+    export: '数据字典导出',
+    diff: '版本对比',
+    generate: 'DDL脚本生成'
+  },
+  config: {
+    title: '数据源配置',
+    subtitle: '管理数据库连接配置',
+    addDataSource: '新增数据源',
+    editDataSource: '编辑数据源',
+    deleteConfirm: '确定要删除数据源 "{name}" 吗?',
+    testSuccess: '连接测试成功',
+    testFailed: '连接测试失败',
+    saveSuccess: '保存成功',
+    saveFailed: '保存失败',
+    deleteSuccess: '删除成功',
+    deleteFailed: '删除失败',
+    loadFailed: '加载数据源失败',
+    form: {
+      name: '配置名称',
+      namePlaceholder: '请输入配置名称',
+      type: '数据库类型',
+      typePlaceholder: '请选择数据库类型',
+      host: '主机',
+      hostPlaceholder: '请输入主机地址',
+      port: '端口',
+      portPlaceholder: '请输入端口号',
+      database: '数据库',
+      databasePlaceholder: '请输入数据库名称',
+      username: '用户名',
+      usernamePlaceholder: '请输入用户名',
+      password: '密码',
+      passwordPlaceholder: '请输入密码',
+      timeout: '超时时间(秒)',
+      timeoutPlaceholder: '请输入超时时间'
+    },
+    dbTypes: {
+      mysql: 'MySQL',
+      oracle: 'Oracle',
+      oceanbase: 'OceanBase',
+      tdsql: 'TDSQL',
+      gaussdb: 'GaussDB',
+      goldendb: 'GoldenDB'
+    }
+  },
+  export: {
+    title: '数据字典导出',
+    subtitle: '导出数据库结构信息',
+    form: {
+      dataSource: '数据源',
+      dataSourcePlaceholder: '请选择数据源',
+      database: '数据库名',
+      databasePlaceholder: '请输入数据库名称',
+      format: '导出格式',
+      includeIndexes: '包含索引',
+      includeForeignKeys: '包含外键',
+      tablePattern: '表名模式',
+      tablePatternPlaceholder: '例如: user_% (可选)',
+      excludeTables: '排除表',
+      excludeTablesPlaceholder: '例如: table1,table2 (可选)'
+    },
+    exportSuccess: '导出成功',
+    exportFailed: '导出失败',
+    loadFailed: '加载数据源失败'
+  },
+  diff: {
+    title: '版本对比',
+    subtitle: '对比两个版本的数据字典差异',
+    oldFile: '旧版本文件',
+    newFile: '新版本文件',
+    selectFile: '选择文件',
+    startCompare: '开始对比',
+    comparing: '对比中...',
+    compareSuccess: '对比完成',
+    compareFailed: '对比失败',
+    selectTwoFiles: '请选择两个文件',
+    summary: {
+      title: '差异统计',
+      totalChanges: '总变更数',
+      breakingChanges: '破坏性变更',
+      tableChanges: '表变更',
+      columnChanges: '字段变更',
+      indexChanges: '索引变更',
+      fkChanges: '外键变更'
+    },
+    changeTypes: {
+      TABLE_ADD: '新增表',
+      TABLE_DROP: '删除表',
+      TABLE_MODIFY: '修改表',
+      COLUMN_ADD: '新增字段',
+      COLUMN_DROP: '删除字段',
+      COLUMN_MODIFY: '修改字段',
+      INDEX_ADD: '新增索引',
+      INDEX_DROP: '删除索引',
+      FOREIGN_KEY_ADD: '新增外键',
+      FOREIGN_KEY_DROP: '删除外键'
+    }
+  },
+  generate: {
+    title: 'DDL脚本生成',
+    subtitle: '根据差异生成DDL变更脚本',
+    uploadDiff: '上传差异文件',
+    options: '选项',
+    includeRollback: '包含回滚脚本',
+    commentBreaking: '注释破坏性变更',
+    useTransaction: '使用事务',
+    generate: '生成脚本',
+    generating: '生成中...',
+    generateSuccess: '生成成功',
+    generateFailed: '生成失败',
+    preview: '脚本预览',
+    download: '下载脚本',
+    noScript: '请先生成脚本'
+  },
+  footer: {
+    copyright: 'SchemaSync v1.0.0 © 2026',
+    poweredBy: '基于 Spring Boot + Vue 3'
+  }
+}

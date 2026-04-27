@@ -1,0 +1,71 @@
+package com.schemasync.controller;
+
+import com.schemasync.model.diff.SchemaDiff;
+import com.schemasync.service.SchemaDiffService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * 数据字典对比控制器
+ * 
+ * @author SchemaSync Team
+ * @since 2026-04-26
+ */
+@RestController
+@RequestMapping("/api/diff")
+@Tag(name = "版本对比", description = "数据字典版本对比接口")
+public class DiffController {
+
+    @Autowired
+    private SchemaDiffService diffService;
+
+    @PostMapping
+    @Operation(summary = "对比两个数据字典文件", description = "上传两个版本的JSON文件,生成差异报告")
+    public ResponseEntity<byte[]> compareFiles(
+            @RequestParam("oldFile") MultipartFile oldFile,
+            @RequestParam("newFile") MultipartFile newFile,
+            @RequestParam(defaultValue = "json") String format) {
+        
+        // 验证文件
+        if (oldFile.isEmpty() || newFile.isEmpty()) {
+            throw new RuntimeException("请上传两个文件");
+        }
+
+        // 执行对比
+        SchemaDiff diff = diffService.compareFiles(oldFile, newFile);
+
+        // 格式化输出
+        byte[] data = diffService.diffToJsonBytes(diff);
+
+        // 设置响应头
+        HttpHeaders headers = new HttpHeaders();
+        String fileName = "diff_" + System.currentTimeMillis() + ".json";
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", fileName);
+        headers.setContentLength(data.length);
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(data);
+    }
+
+    @PostMapping("/summary")
+    @Operation(summary = "获取差异统计", description = "上传两个版本的JSON文件,返回差异统计信息")
+    public ResponseEntity<SchemaDiff> compareAndGetSummary(
+            @RequestParam("oldFile") MultipartFile oldFile,
+            @RequestParam("newFile") MultipartFile newFile) {
+        
+        if (oldFile.isEmpty() || newFile.isEmpty()) {
+            throw new RuntimeException("请上传两个文件");
+        }
+
+        SchemaDiff diff = diffService.compareFiles(oldFile, newFile);
+        return ResponseEntity.ok(diff);
+    }
+}
