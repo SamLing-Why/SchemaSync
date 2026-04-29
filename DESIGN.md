@@ -3,9 +3,27 @@
 ## 文档信息
 
 - **项目名称**: SchemaSync - 轻量级数据字典管理工具
-- **文档版本**: v1.0
+- **文档版本**: v1.2
 - **创建日期**: 2026-04-26
+- **最后更新**: 2026-04-29
 - **基于文档**: REQUIREMENTS.md v1.1
+- **当前版本**: 1.0.0-SNAPSHOT
+- **Git提交**: 03dca90
+
+---
+
+## 项目概述
+
+SchemaSync是一个轻量级数据字典管理工具，支持多数据库适配器的数据字典导出、版本对比和DDL脚本生成功能。
+
+### 核心特性
+
+1. **多数据库支持**：MySQL、Oracle、OceanBase、TDSQL、GaussDB、GoldenDB
+2. **数据字典导出**：支持JSON和Excel格式
+3. **版本对比**：对比两个版本的数据字典，生成差异报告
+4. **DDL生成**：根据差异生成增量DDL脚本
+5. **前后端一体化**：打包为单个JAR包，便于部署
+6. **外置配置**：支持application.yml外置配置
 
 ---
 
@@ -1574,6 +1592,161 @@ docker run -d -p 8080:8080 -v /data/config:/app/config schemasync:latest
 - TDSQL最新版本
 - GaussDB最新版本
 - GoldenDB最新版本
+
+---
+
+## 十、构建与部署
+
+### 10.1 构建方式
+
+#### Maven一键打包
+
+项目使用 `frontend-maven-plugin` 实现前后端一体化构建：
+
+```bash
+# Windows
+build.bat
+
+# Linux/Mac
+chmod +x build.sh
+./build.sh
+```
+
+**构建流程**：
+1. 检查Java和Maven环境
+2. 清理旧构建 (`mvn clean`)
+3. Maven打包（自动构建前端）
+   - 安装Node.js和npm
+   - 执行 `npm install`
+   - 执行 `npm run build`
+   - 将前端产物复制到后端 `resources/static`
+4. 生成可执行JAR包
+5. 创建 `deploy/` 目录并复制文件
+
+### 10.2 部署包结构
+
+```
+deploy/
+├── schemasync.jar              # 54.35 MB - 完整应用
+├── application.yml             # 外置配置文件
+├── start.bat                   # Windows启动脚本
+├── start.sh                    # Linux启动脚本
+├── DEPLOY.md                   # 部署文档
+└── 打包清单.txt                # 打包清单
+```
+
+### 10.3 部署步骤
+
+**Windows服务器**：
+```batch
+# 1. 复制 deploy 目录到服务器
+# 2. 双击 start.bat 启动
+# 3. 访问 http://localhost:8080
+```
+
+**Linux服务器**：
+```bash
+# 1. 复制 deploy 目录到服务器
+# 2. 赋权并启动
+chmod +x start.sh
+./start.sh
+
+# 3. 后台运行
+nohup java -jar schemasync.jar --spring.config.location=application.yml > /dev/null 2>&1 &
+
+# 4. 访问 http://localhost:8080
+```
+
+### 10.4 环境要求
+
+**构建环境**：
+- JDK: 8 或更高版本
+- Maven: 3.6 或更高版本
+- Node.js: 16+ (由Maven自动管理)
+
+**运行环境**：
+- JDK: 8 或更高版本
+- 内存: 至少 512MB
+- 磁盘: 至少 200MB
+
+### 10.5 配置说明
+
+**外置配置文件** (`application.yml`)：
+
+```yaml
+server:
+  port: 8080  # 可自定义端口
+
+schemasync:
+  default-output-dir: ./output  # 导出文件目录
+  max-pool-size: 10             # 连接池大小
+  connection-timeout: 30        # 连接超时
+
+logging:
+  level:
+    com.schemasync: DEBUG  # 日志级别
+  file:
+    name: logs/schemasync.log  # 日志文件
+```
+
+**数据源配置**：
+- 位置: `~/.schemasync/schemasync-config.json`
+- 格式: JSON
+- 支持动态添加和修改
+
+---
+
+## 十一、版本历史
+
+### v1.0.0-SNAPSHOT (2026-04-29)
+
+**核心功能**：
+- ✅ 多数据库适配器（6种数据库）
+- ✅ 数据字典导出（JSON/Excel）
+- ✅ 版本对比与差异分析
+- ✅ DDL脚本生成（差异化/全量）
+- ✅ 前后端一体化打包
+- ✅ 外置配置支持
+
+**主要改进**：
+- 索引变更完整支持（INDEX_ADD/INDEX_DROP/INDEX_MODIFY）
+- Excel导出详情格式化
+- DDL生成精度优化
+- 构建脚本优化（build.bat/build.sh）
+- 部署包自动生成
+
+**已知问题**：
+- 无
+
+---
+
+## 附录
+
+### A. 关键设计决策
+
+1. **前后端分离 → 一体化打包**
+   - 开发时：前后端分离，便于调试
+   - 部署时：打包为单JAR，简化部署
+
+2. **无本地数据库**
+   - 配置存储在JSON文件
+   - 轻量化，降低运维成本
+
+3. **策略模式实现数据库适配**
+   - 便于扩展新数据库
+   - 代码隔离，降低耦合
+
+### B. 技术栈版本
+
+| 组件 | 版本 |
+|------|------|
+| Spring Boot | 2.7.18 |
+| Vue | 3.x |
+| Vite | 5.4.21 |
+| Element Plus | 2.x |
+| Apache POI | 5.2.5 |
+| FastJSON2 | 2.0.42 |
+| HikariCP | 5.0.1 |
 
 ---
 

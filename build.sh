@@ -38,31 +38,32 @@ if [ $? -ne 0 ]; then
 fi
 echo "[成功] 清理完成"
 
-# 构建前端
-echo ""
-echo "[4/5] 构建前端项目..."
-cd ../schemasync-frontend || exit 1
-npm install
-if [ $? -ne 0 ]; then
-    echo "[错误] 前端依赖安装失败"
-    exit 1
-fi
-
-npm run build
-if [ $? -ne 0 ]; then
-    echo "[错误] 前端构建失败"
-    exit 1
-fi
-echo "[成功] 前端构建完成"
-
 # 打包后端(包含前端)
 echo ""
-echo "[5/5] 打包后端(包含前端资源)..."
+echo "[4/5] 打包后端(包含前端资源)..."
 cd ../schemasync-backend || exit 1
-mvn package -DskipTests
+mvn clean package -DskipTests
 if [ $? -ne 0 ]; then
     echo "[错误] 打包失败"
     exit 1
+fi
+
+# 创建部署包
+echo ""
+echo "[5/5] 创建部署包..."
+cd .. || exit 1
+mkdir -p deploy
+
+# 复制JAR文件
+cp schemasync-backend/target/schemasync-backend-1.0.0-SNAPSHOT.jar deploy/schemasync.jar
+if [ $? -ne 0 ]; then
+    echo "[错误] 复制JAR文件失败"
+    exit 1
+fi
+
+# 复制配置文件
+if [ -f schemasync-backend/src/main/resources/application.yml ]; then
+    cp schemasync-backend/src/main/resources/application.yml deploy/application.yml
 fi
 
 echo ""
@@ -70,14 +71,18 @@ echo "========================================"
 echo "  打包成功!"
 echo "========================================"
 echo ""
-echo "JAR文件位置: schemasync-backend/target/schemasync-backend-1.0.0-SNAPSHOT.jar"
+echo "JAR文件: deploy/schemasync.jar"
+echo "配置文件: deploy/application.yml"
+echo "启动脚本: deploy/start.sh"
 echo ""
-echo "启动命令:"
-echo "  java -jar schemasync-backend/target/schemasync-backend-1.0.0-SNAPSHOT.jar"
+echo "部署步骤:"
+echo "  1. 将 deploy 目录复制到服务器"
+echo "  2. Windows: 双击 start.bat"
+echo "  3. Linux:   chmod +x start.sh && ./start.sh"
 echo ""
 echo "访问地址:"
-echo "  后端API: http://localhost:8080/api"
-echo "  前端页面: http://localhost:8080"
+echo "  应用主页: http://localhost:8080"
+echo "  API文档:  http://localhost:8080/api-docs"
 echo ""
 echo "========================================"
 echo ""

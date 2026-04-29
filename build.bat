@@ -1,7 +1,7 @@
 @echo off
+chcp 65001 >nul
 REM ========================================
-REM SchemaSync 一键打包脚本
-REM 将前后端打包成一个可执行的JAR文件
+REM SchemaSync 一键打包脚本 (简化版)
 REM ========================================
 
 echo.
@@ -23,7 +23,7 @@ echo [成功] Java环境正常
 REM 检查Maven
 echo.
 echo [2/5] 检查Maven环境...
-mvn -version >nul 2>&1
+call mvn -version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [错误] 未找到Maven,请先安装Maven 3.6+
     pause
@@ -31,61 +31,53 @@ if %errorlevel% neq 0 (
 )
 echo [成功] Maven环境正常
 
-REM 清理旧构建
+REM 清理并打包
 echo.
-echo [3/5] 清理旧构建...
-cd schemasync-backend
-call mvn clean
-if %errorlevel% neq 0 (
-    echo [错误] 清理失败
-    pause
-    exit /b 1
-)
-echo [成功] 清理完成
-
-REM 构建前端
-echo.
-echo [4/5] 构建前端项目...
-cd ..\schemasync-frontend
-call npm install
-if %errorlevel% neq 0 (
-    echo [错误] 前端依赖安装失败
-    pause
-    exit /b 1
-)
-
-call npm run build
-if %errorlevel% neq 0 (
-    echo [错误] 前端构建失败
-    pause
-    exit /b 1
-)
-echo [成功] 前端构建完成
-
-REM 打包后端(包含前端)
-echo.
-echo [5/5] 打包后端(包含前端资源)...
-cd ..\schemasync-backend
-call mvn package -DskipTests
+echo [3/5] 清理并打包(包含前端)...
+cd /d "%~dp0schemasync-backend"
+call mvn clean package -DskipTests
 if %errorlevel% neq 0 (
     echo [错误] 打包失败
     pause
     exit /b 1
 )
+echo [成功] 打包完成
+
+REM 创建部署包
+echo.
+echo [4/5] 创建部署目录...
+cd /d "%~dp0"
+if not exist deploy mkdir deploy
+echo [成功] 部署目录就绪
+
+REM 复制文件
+echo.
+echo [5/5] 复制部署文件...
+copy /Y schemasync-backend\target\schemasync-backend-1.0.0-SNAPSHOT.jar deploy\schemasync.jar >nul
+if exist schemasync-backend\src\main\resources\application.yml (
+    copy /Y schemasync-backend\src\main\resources\application.yml deploy\application.yml >nul
+)
+echo [成功] 文件复制完成
 
 echo.
 echo ========================================
 echo   打包成功!
 echo ========================================
 echo.
-echo JAR文件位置: schemasync-backend\target\schemasync-backend-1.0.0-SNAPSHOT.jar
+echo 部署包位置: deploy\
+echo   - schemasync.jar
+echo   - application.yml
+echo   - start.bat
+echo   - start.sh
+echo   - DEPLOY.md
 echo.
-echo 启动命令:
-echo   java -jar schemasync-backend\target\schemasync-backend-1.0.0-SNAPSHOT.jar
+echo 部署说明:
+echo   1. 将 deploy 目录复制到服务器
+echo   2. Windows: 双击 start.bat
+echo   3. Linux:   chmod +x start.sh ^&^& ./start.sh
 echo.
 echo 访问地址:
-echo   后端API: http://localhost:8080/api
-echo   前端页面: http://localhost:8080
+echo   http://服务器IP:8080
 echo.
 echo ========================================
 echo.
