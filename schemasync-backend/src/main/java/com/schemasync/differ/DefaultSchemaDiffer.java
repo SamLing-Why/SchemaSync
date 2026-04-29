@@ -343,22 +343,53 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
         // 新增索引
         for (String indexName : newIndexMap.keySet()) {
             if (!oldIndexMap.containsKey(indexName)) {
+                IndexDefinition newIndex = newIndexMap.get(indexName);
                 changes.add(SchemaChange.builder()
                         .changeType(ChangeType.INDEX_ADD)
                         .tableName(tableName)
                         .severity(Severity.NON_BREAKING)
+                        .details(newIndex)
                         .build());
+                log.debug("表{} 新增索引: {}", tableName, indexName);
             }
         }
 
         // 删除索引
         for (String indexName : oldIndexMap.keySet()) {
             if (!newIndexMap.containsKey(indexName)) {
+                IndexDefinition oldIndex = oldIndexMap.get(indexName);
                 changes.add(SchemaChange.builder()
                         .changeType(ChangeType.INDEX_DROP)
                         .tableName(tableName)
                         .severity(Severity.NON_BREAKING)
+                        .details(oldIndex)
                         .build());
+                log.debug("表{} 删除索引: {}", tableName, indexName);
+            }
+        }
+        
+        // 修改索引（对比同名索引的定义）
+        for (String indexName : newIndexMap.keySet()) {
+            if (oldIndexMap.containsKey(indexName)) {
+                IndexDefinition oldIndex = oldIndexMap.get(indexName);
+                IndexDefinition newIndex = newIndexMap.get(indexName);
+                
+                // 对比索引定义是否变化
+                if (!Objects.equals(oldIndex.getIndexType(), newIndex.getIndexType()) ||
+                    !Objects.equals(oldIndex.getIsUnique(), newIndex.getIsUnique()) ||
+                    !Objects.equals(oldIndex.getColumns(), newIndex.getColumns())) {
+                    changes.add(SchemaChange.builder()
+                            .changeType(ChangeType.INDEX_MODIFY)
+                            .tableName(tableName)
+                            .severity(Severity.NON_BREAKING)
+                            .details(Map.of(
+                                    "indexName", indexName,
+                                    "oldValue", oldIndex,
+                                    "newValue", newIndex
+                            ))
+                            .build());
+                    log.debug("表{} 修改索引: {}", tableName, indexName);
+                }
             }
         }
     }

@@ -88,26 +88,14 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <!-- 变更列表 -->
-        <el-table v-if="diffResult.changes && diffResult.changes.length > 0" :data="diffResult.changes" style="margin-top: 20px;" border>
-          <el-table-column prop="changeType" label="变更类型" width="120">
-            <template #default="{ row }">
-              <el-tag :type="getChangeTypeTag(row.changeType)">{{ getChangeTypeLabel(row.changeType) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="tableName" label="表名" width="200" />
-          <el-table-column prop="columnName" label="字段名" width="200" />
-          <el-table-column prop="severity" label="严重程度" width="120">
-            <template #default="{ row }">
-              <el-tag :type="getSeverityTag(row.severity)">{{ getSeverityLabel(row.severity) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="details" label="详情">
-            <template #default="{ row }">
-              {{ formatDetails(row.details) }}
-            </template>
-          </el-table-column>
-        </el-table>
+        <el-alert
+          title="提示"
+          type="info"
+          description="差异明细数据较多，请通过【下载差异报告】查看完整的变更明细。"
+          show-icon
+          :closable="false"
+          style="margin-top: 20px;"
+        />
       </el-card>
     </el-card>
   </div>
