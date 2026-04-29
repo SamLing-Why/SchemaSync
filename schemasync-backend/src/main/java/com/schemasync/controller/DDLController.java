@@ -29,15 +29,9 @@ public class DdlController {
     
     @PostMapping("/generate")
     @Operation(summary = "生成全量DDL脚本", description = "基于数据字典文件生成全量DDL")
-    public ResponseEntity<byte[]> generateDdl(@RequestParam MultipartFile file) {
-        String filename = file.getOriginalFilename();
-        if (filename == null || filename.isEmpty()) {
-            throw new RuntimeException("文件名不能为空");
-        }
-        
-        String fileType = filename.endsWith(".xlsx") || filename.endsWith(".xls") 
-            ? "excel" : "json";
-        
+    public ResponseEntity<byte[]> generateDdl(
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "excel") String fileType) {
         try (InputStream inputStream = file.getInputStream()) {
             String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
             
@@ -45,7 +39,44 @@ public class DdlController {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            String downloadName = filename.replaceAll("\\.(json|xlsx|xls)$", "") + ".sql";
+            String downloadName = "ddl_" + System.currentTimeMillis() + ".sql";
+            headers.setContentDispositionFormData("attachment", downloadName);
+            headers.setContentLength(ddlBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(ddlBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("生成DDL失败: " + e.getMessage(), e);
+        }
+    }
+    
+    @PostMapping("/preview")
+    @Operation(summary = "预览DDL脚本", description = "预览生成的DDL脚本")
+    public ResponseEntity<String> previewDdl(
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "excel") String fileType) {
+        try (InputStream inputStream = file.getInputStream()) {
+            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
+            return ResponseEntity.ok(ddl);
+        } catch (Exception e) {
+            throw new RuntimeException("生成DDL失败: " + e.getMessage(), e);
+        }
+    }
+    
+    @PostMapping("/download")
+    @Operation(summary = "下载DDL脚本", description = "下载生成的DDL脚本文件")
+    public ResponseEntity<byte[]> downloadDdl(
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "excel") String fileType) {
+        try (InputStream inputStream = file.getInputStream()) {
+            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
+            
+            byte[] ddlBytes = ddl.getBytes(StandardCharsets.UTF_8);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            String downloadName = "ddl_" + System.currentTimeMillis() + ".sql";
             headers.setContentDispositionFormData("attachment", downloadName);
             headers.setContentLength(ddlBytes.length);
             

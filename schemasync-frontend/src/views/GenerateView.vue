@@ -2,29 +2,28 @@
   <div class="generate-view">
     <el-card>
       <template #header>
-        <h2>差异化DDL脚本生成</h2>
+        <h2>全量DDL脚本生成</h2>
       </template>
 
       <el-form label-width="120px">
-        <el-form-item label="旧版本文件">
-          <el-upload
-            :auto-upload="false"
-            :limit="1"
-            accept=".json"
-            @change="handleOldFile"
-          >
-            <el-button type="primary">选择文件</el-button>
-          </el-upload>
+        <el-form-item label="文件格式">
+          <el-radio-group v-model="fileType">
+            <el-radio label="excel">Excel</el-radio>
+            <el-radio label="json">JSON</el-radio>
+          </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="新版本文件">
+        <el-form-item label="数据字典文件">
           <el-upload
             :auto-upload="false"
             :limit="1"
-            accept=".json"
-            @change="handleNewFile"
+            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
+            @change="handleFile"
           >
             <el-button type="primary">选择文件</el-button>
+            <template #tip>
+              <div class="el-upload__tip">请选择数据字典文件({{ fileType === 'excel' ? 'Excel' : 'JSON' }})</div>
+            </template>
           </el-upload>
         </el-form-item>
 
@@ -32,12 +31,6 @@
           <el-select v-model="form.databaseType">
             <el-option label="MySQL" value="mysql" />
           </el-select>
-        </el-form-item>
-
-        <el-form-item label="选项">
-          <el-checkbox v-model="form.includeRollback">包含回滚脚本</el-checkbox>
-          <el-checkbox v-model="form.commentBreakingChanges">注释破坏性变更</el-checkbox>
-          <el-checkbox v-model="form.useTransaction">使用事务</el-checkbox>
         </el-form-item>
 
         <el-form-item>
@@ -71,41 +64,31 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Document, Download } from '@element-plus/icons-vue'
 
-const oldFile = ref(null)
-const newFile = ref(null)
+const selectedFile = ref(null)
 const generating = ref(false)
 const ddlScript = ref('')
+const fileType = ref('excel')
 
 const form = ref({
-  databaseType: 'mysql',
-  includeRollback: true,
-  commentBreakingChanges: true,
-  useTransaction: true
+  databaseType: 'mysql'
 })
 
-const handleOldFile = (file) => {
-  oldFile.value = file.raw
-}
-
-const handleNewFile = (file) => {
-  newFile.value = file.raw
+const handleFile = (file) => {
+  selectedFile.value = file.raw
 }
 
 const handleGenerate = async () => {
-  if (!oldFile.value || !newFile.value) {
-    ElMessage.warning('请选择两个文件')
+  if (!selectedFile.value) {
+    ElMessage.warning('请选择文件')
     return
   }
 
   generating.value = true
   try {
     const formData = new FormData()
-    formData.append('oldFile', oldFile.value)
-    formData.append('newFile', newFile.value)
+    formData.append('file', selectedFile.value)
+    formData.append('fileType', fileType.value)
     formData.append('databaseType', form.value.databaseType)
-    formData.append('includeRollback', form.value.includeRollback)
-    formData.append('commentBreakingChanges', form.value.commentBreakingChanges)
-    formData.append('useTransaction', form.value.useTransaction)
 
     const response = await fetch('/api/ddl/preview', {
       method: 'POST',
@@ -128,14 +111,11 @@ const handleGenerate = async () => {
 const downloadDDL = async () => {
   try {
     const formData = new FormData()
-    formData.append('oldFile', oldFile.value)
-    formData.append('newFile', newFile.value)
+    formData.append('file', selectedFile.value)
+    formData.append('fileType', fileType.value)
     formData.append('databaseType', form.value.databaseType)
-    formData.append('includeRollback', form.value.includeRollback)
-    formData.append('commentBreakingChanges', form.value.commentBreakingChanges)
-    formData.append('useTransaction', form.value.useTransaction)
 
-    const response = await fetch('/api/ddl', {
+    const response = await fetch('/api/ddl/download', {
       method: 'POST',
       body: formData
     })

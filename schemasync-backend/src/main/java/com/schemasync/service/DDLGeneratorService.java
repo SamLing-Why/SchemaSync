@@ -54,7 +54,7 @@ public class DdlGeneratorService {
     /**
      * 从数据字典生成DDL SQL
      */
-    private String generateDdlFromDictionary(SchemaDictionary dictionary) {
+    public String generateDdlFromDictionary(SchemaDictionary dictionary) {
         StringBuilder sql = new StringBuilder();
         
         // 1. 添加注释头
@@ -90,7 +90,7 @@ public class DdlGeneratorService {
     /**
      * 生成单个表的CREATE TABLE语句
      */
-    private String generateCreateTable(TableDefinition table) {
+    public String generateCreateTable(TableDefinition table) {
         StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE `").append(table.getTableName()).append("` (\n");
         
@@ -193,7 +193,7 @@ public class DdlGeneratorService {
     /**
      * 生成视图的CREATE VIEW语句
      */
-    private String generateCreateView(TableDefinition view) {
+    public String generateCreateView(TableDefinition view) {
         StringBuilder sql = new StringBuilder();
         sql.append("CREATE OR REPLACE VIEW `").append(view.getTableName()).append("` AS\n");
         

@@ -6,17 +6,24 @@
       </template>
 
       <el-form label-width="120px">
+        <el-form-item label="文件格式">
+          <el-radio-group v-model="fileType">
+            <el-radio label="excel">Excel</el-radio>
+            <el-radio label="json">JSON</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
         <el-form-item label="旧版本文件">
           <el-upload
             ref="oldUpload"
             :auto-upload="false"
             :limit="1"
-            accept=".json,.xlsx,.xls"
+            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
             @change="handleOldFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择旧版本数据字典文件(JSON或Excel)</div>
+              <div class="el-upload__tip">请选择旧版本数据字典文件({{ fileType === 'excel' ? 'Excel' : 'JSON' }})</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -26,14 +33,21 @@
             ref="newUpload"
             :auto-upload="false"
             :limit="1"
-            accept=".json,.xlsx,.xls"
+            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
             @change="handleNewFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择新版本数据字典文件(JSON或Excel)</div>
+              <div class="el-upload__tip">请选择新版本数据字典文件({{ fileType === 'excel' ? 'Excel' : 'JSON' }})</div>
             </template>
           </el-upload>
+        </el-form-item>
+
+        <el-form-item label="导出格式">
+          <el-radio-group v-model="exportFormat">
+            <el-radio label="excel">Excel</el-radio>
+            <el-radio label="json">JSON</el-radio>
+          </el-radio-group>
         </el-form-item>
 
         <el-form-item>
@@ -47,7 +61,19 @@
       <!-- 差异结果 -->
       <el-card v-if="diffResult" style="margin-top: 20px;">
         <template #header>
-          <h3>差异统计</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>差异统计</h3>
+            <div>
+              <el-button type="success" @click="downloadDiff">
+                <el-icon><Download /></el-icon>
+                下载差异报告
+              </el-button>
+              <el-button type="warning" @click="generateDdl" :loading="generatingDdl">
+                <el-icon><Download /></el-icon>
+                生成DDL脚本
+              </el-button>
+            </div>
+          </div>
         </template>
 
         <el-descriptions :column="3" border>
@@ -62,10 +88,26 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <el-button type="success" @click="downloadDiff" style="margin-top: 20px;">
-          <el-icon><Download /></el-icon>
-          下载差异报告
-        </el-button>
+        <!-- 变更列表 -->
+        <el-table v-if="diffResult.changes && diffResult.changes.length > 0" :data="diffResult.changes" style="margin-top: 20px;" border>
+          <el-table-column prop="changeType" label="变更类型" width="120">
+            <template #default="{ row }">
+              <el-tag :type="getChangeTypeTag(row.changeType)">{{ getChangeTypeLabel(row.changeType) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="tableName" label="表名" width="200" />
+          <el-table-column prop="columnName" label="字段名" width="200" />
+          <el-table-column prop="severity" label="严重程度" width="120">
+            <template #default="{ row }">
+              <el-tag :type="getSeverityTag(row.severity)">{{ getSeverityLabel(row.severity) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="details" label="详情">
+            <template #default="{ row }">
+              {{ formatDetails(row.details) }}
+            </template>
+          </el-table-column>
+        </el-table>
       </el-card>
     </el-card>
   </div>
@@ -76,9 +118,12 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Switch as Compare, Download } from '@element-plus/icons-vue'
 
+const fileType = ref('excel')
+const exportFormat = ref('excel')
 const oldFile = ref(null)
 const newFile = ref(null)
 const comparing = ref(false)
+const generatingDdl = ref(false)
 const diffResult = ref(null)
 
 const handleOldFile = (file) => {
@@ -124,6 +169,7 @@ const downloadDiff = async () => {
     const formData = new FormData()
     formData.append('oldFile', oldFile.value)
     formData.append('newFile', newFile.value)
+    formData.append('exportFormat', exportFormat.value)
 
     const response = await fetch('/api/diff', {
       method: 'POST',
@@ -134,7 +180,8 @@ const downloadDiff = async () => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `diff_${Date.now()}.json`
+    const extension = exportFormat.value === 'excel' ? 'xlsx' : 'json'
+    a.download = `diff_${Date.now()}.${extension}`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
@@ -144,6 +191,93 @@ const downloadDiff = async () => {
   } catch (error) {
     ElMessage.error('下载失败')
   }
+}
+
+const generateDdl = async () => {
+  if (!diffResult.value) {
+    ElMessage.warning('请先进行对比')
+    return
+  }
+
+  generatingDdl.value = true
+  try {
+    const formData = new FormData()
+    formData.append('oldFile', oldFile.value)
+    formData.append('newFile', newFile.value)
+
+    const response = await fetch('/api/diff/ddl', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error('DDL生成失败')
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ddl_${Date.now()}.sql`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    ElMessage.success('DDL脚本生成成功')
+  } catch (error) {
+    ElMessage.error('DDL生成失败: ' + error.message)
+  } finally {
+    generatingDdl.value = false
+  }
+}
+
+const getChangeTypeTag = (type) => {
+  const map = {
+    'TABLE_ADD': 'success',
+    'TABLE_DROP': 'danger',
+    'TABLE_MODIFY': 'warning',
+    'COLUMN_ADD': 'success',
+    'COLUMN_DROP': 'danger',
+    'COLUMN_MODIFY': 'warning'
+  }
+  return map[type] || 'info'
+}
+
+const getChangeTypeLabel = (type) => {
+  const map = {
+    'TABLE_ADD': '新增表',
+    'TABLE_DROP': '删除表',
+    'TABLE_MODIFY': '修改表',
+    'COLUMN_ADD': '新增字段',
+    'COLUMN_DROP': '删除字段',
+    'COLUMN_MODIFY': '修改字段'
+  }
+  return map[type] || type
+}
+
+const getSeverityTag = (severity) => {
+  const map = {
+    'HIGH': 'danger',
+    'MEDIUM': 'warning',
+    'LOW': 'info'
+  }
+  return map[severity] || 'info'
+}
+
+const getSeverityLabel = (severity) => {
+  const map = {
+    'HIGH': '高',
+    'MEDIUM': '中',
+    'LOW': '低'
+  }
+  return map[severity] || severity
+}
+
+const formatDetails = (details) => {
+  if (!details) return '-'
+  if (typeof details === 'string') return details
+  return JSON.stringify(details)
 }
 </script>
 
