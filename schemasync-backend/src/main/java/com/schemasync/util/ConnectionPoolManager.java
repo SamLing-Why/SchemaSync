@@ -120,8 +120,10 @@ public class ConnectionPoolManager {
                     config.getHost(), config.getPort(), config.getDatabase()
                 );
             case "GAUSSDB":
+                // GaussDB支持PostgreSQL协议和OpenGauss协议
+                // 使用PostgreSQL驱动，关闭SSL要求，增加兼容性
                 return String.format(
-                    "jdbc:postgresql://%s:%d/%s?sslmode=require",
+                    "jdbc:postgresql://%s:%d/%s?sslmode=disable&loggerLevel=OFF",
                     config.getHost(), config.getPort(), config.getDatabase()
                 );
             default:

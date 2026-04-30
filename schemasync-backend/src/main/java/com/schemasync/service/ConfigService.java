@@ -307,9 +307,22 @@ public class ConfigService {
                 config.getPort(),
                 config.getDatabase());
             
-            com.schemasync.adapter.DatabaseAdapter adapter = adapterFactory.getAdapter(config.getType());
+            // 解密密码(如果是加密的)
+            DataSourceConfig configCopy = cloneConfig(config);
+            if (configCopy.getPassword() != null && CryptoUtil.isEncrypted(configCopy.getPassword())) {
+                try {
+                    String decryptedPassword = CryptoUtil.decrypt(configCopy.getPassword());
+                    configCopy.setPassword(decryptedPassword);
+                    log.debug("密码已解密");
+                } catch (Exception e) {
+                    log.error("密码解密失败", e);
+                    // 解密失败，尝试使用原密码
+                }
+            }
             
-            java.sql.Connection conn = adapter.connect(config);
+            com.schemasync.adapter.DatabaseAdapter adapter = adapterFactory.getAdapter(configCopy.getType());
+            
+            java.sql.Connection conn = adapter.connect(configCopy);
             boolean isValid = conn.isValid(5); // 5秒超时
             conn.close();
             
@@ -318,6 +331,26 @@ public class ConfigService {
             log.error("测试连接失败", e);
             return false;
         }
+    }
+
+    /**
+     * 克隆配置对象
+     */
+    private DataSourceConfig cloneConfig(DataSourceConfig config) {
+        DataSourceConfig copy = new DataSourceConfig();
+        copy.setId(config.getId());
+        copy.setName(config.getName());
+        copy.setType(config.getType());
+        copy.setHost(config.getHost());
+        copy.setPort(config.getPort());
+        copy.setDatabase(config.getDatabase());
+        copy.setUsername(config.getUsername());
+        copy.setPassword(config.getPassword());
+        copy.setCharset(config.getCharset());
+        copy.setTimeout(config.getTimeout());
+        copy.setJdbcUrl(config.getJdbcUrl());
+        copy.setPoolConfig(config.getPoolConfig());
+        return copy;
     }
 
     /**

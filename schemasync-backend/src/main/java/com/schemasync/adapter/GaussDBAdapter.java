@@ -25,12 +25,23 @@ public class GaussDBAdapter implements DatabaseAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(GaussDBAdapter.class);
 
-    // GaussDB使用PostgreSQL兼容模式
+    // GaussDB使用PostgreSQL兼容模式，补充表类型和创建时间
     private static final String QUERY_TABLES = 
-        "SELECT tablename AS TABLE_NAME, obj_description((schemaname || '.' || tablename)::regclass) AS TABLE_COMMENT " +
-        "FROM pg_tables " +
-        "WHERE schemaname = ? " +
-        "ORDER BY tablename";
+        "SELECT " +
+        "    t.tablename AS TABLE_NAME, " +
+        "    obj_description((t.schemaname || '.' || t.tablename)::regclass) AS TABLE_COMMENT, " +
+        "    CASE c.relkind " +
+        "        WHEN 'r' THEN 'BASE TABLE' " +
+        "        WHEN 'v' THEN 'VIEW' " +
+        "        WHEN 'm' THEN 'MATERIALIZED VIEW' " +
+        "        ELSE 'UNKNOWN' " +
+        "    END AS TABLE_TYPE, " +
+        "    NULL AS CREATE_TIME " +  // GaussDB不直接提供表创建时间
+        "FROM pg_tables t " +
+        "JOIN pg_class c ON c.relname = t.tablename " +
+        "JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = t.schemaname " +
+        "WHERE t.schemaname = ? " +
+        "ORDER BY t.tablename";
 
     private static final String QUERY_COLUMNS = 
         "SELECT " +
@@ -72,7 +83,7 @@ public class GaussDBAdapter implements DatabaseAdapter {
         "    i.relname AS INDEX_NAME, " +
         "    CASE WHEN ix.indisunique THEN 0 ELSE 1 END AS NON_UNIQUE, " +
         "    CASE WHEN ix.indisprimary THEN 'PRIMARY' ELSE 'INDEX' END AS INDEX_TYPE, " +
-        "    array_to_string(array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)), ',') AS COLUMNS " +
+        "    array_to_string(array_agg(a.attname ORDER BY a.attnum), ',') AS COLUMNS " +
         "FROM pg_index ix " +
         "JOIN pg_class c ON c.oid = ix.indrelid " +
         "JOIN pg_class i ON i.oid = ix.indexrelid " +
@@ -154,10 +165,12 @@ public class GaussDBAdapter implements DatabaseAdapter {
         dictionary.setMetadata(metadata);
         
         try (Connection conn = connect(config)) {
-            // GaussDB使用public schema
-            String schema = "public";
+            // 自动检测schema，不局限于public
+            String schema = detectSchema(conn, options.getDatabase());
+            log.info("GaussDB检测到schema: {}", schema);
             
             List<TableDefinition> tables = getTables(conn, schema);
+            log.info("GaussDB获取到{}张表", tables.size());
             
             if (options.getTablePattern() != null) {
                 String pattern = options.getTablePattern().replace("%", ".*");
@@ -186,6 +199,29 @@ public class GaussDBAdapter implements DatabaseAdapter {
         return dictionary;
     }
 
+    /**
+     * 检测数据库中的schema
+     * 优先使用有用户表的schema，排除系统schema
+     */
+    private String detectSchema(Connection conn, String database) throws SQLException {
+        // 先尝试获取非系统schema且有表的
+        String sql = "SELECT schemaname FROM pg_tables " +
+                     "WHERE schemaname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') " +
+                     "GROUP BY schemaname " +
+                     "ORDER BY COUNT(*) DESC " +
+                     "LIMIT 1";
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getString("schemaname");
+            }
+        }
+        
+        // 如果没找到，返回public
+        return "public";
+    }
+
     @Override
     public List<TableDefinition> getTables(Connection conn, String schema) throws SQLException {
         List<TableDefinition> tables = new ArrayList<>();
@@ -198,6 +234,19 @@ public class GaussDBAdapter implements DatabaseAdapter {
                     TableDefinition table = new TableDefinition();
                     table.setTableName(rs.getString("TABLE_NAME"));
                     table.setTableComment(rs.getString("TABLE_COMMENT"));
+                    
+                    // 表类型
+                    String tableType = rs.getString("TABLE_TYPE");
+                    if (tableType != null) {
+                        table.setTableType(tableType);
+                    }
+                    
+                    // 创建时间
+                    Timestamp createTime = rs.getTimestamp("CREATE_TIME");
+                    if (createTime != null) {
+                        table.setCreateTime(new Date(createTime.getTime()));
+                    }
+                    
                     tables.add(table);
                 }
             }

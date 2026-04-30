@@ -7,6 +7,7 @@ import com.schemasync.formatter.ExcelFormatter;
 import com.schemasync.formatter.JsonFormatter;
 import com.schemasync.model.config.DataSourceConfig;
 import com.schemasync.model.dict.SchemaDictionary;
+import com.schemasync.util.CryptoUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,9 +71,21 @@ public class SchemaExportService {
         DatabaseAdapter adapter = adapterFactory.getAdapter(config.getType());
         log.debug("使用适配器: {}", adapter.getDatabaseType());
 
+        // 3. 解密密码(如果是加密的)
+        DataSourceConfig configCopy = cloneConfig(config);
+        if (configCopy.getPassword() != null && CryptoUtil.isEncrypted(configCopy.getPassword())) {
+            try {
+                String decryptedPassword = CryptoUtil.decrypt(configCopy.getPassword());
+                configCopy.setPassword(decryptedPassword);
+                log.debug("密码已解密");
+            } catch (Exception e) {
+                log.error("密码解密失败", e);
+            }
+        }
+
         try {
-            // 3. 导出数据字典
-            SchemaDictionary dictionary = adapter.exportSchema(config, options);
+            // 4. 导出数据字典
+            SchemaDictionary dictionary = adapter.exportSchema(configCopy, options);
 
             // 4. 根据格式输出
             byte[] result;
@@ -97,5 +110,25 @@ public class SchemaExportService {
     public String exportSchemaAsString(String configName, ExportOptions options) {
         byte[] data = exportSchema(configName, options);
         return new String(data);
+    }
+
+    /**
+     * 克隆配置对象
+     */
+    private DataSourceConfig cloneConfig(DataSourceConfig config) {
+        DataSourceConfig copy = new DataSourceConfig();
+        copy.setId(config.getId());
+        copy.setName(config.getName());
+        copy.setType(config.getType());
+        copy.setHost(config.getHost());
+        copy.setPort(config.getPort());
+        copy.setDatabase(config.getDatabase());
+        copy.setUsername(config.getUsername());
+        copy.setPassword(config.getPassword());
+        copy.setCharset(config.getCharset());
+        copy.setTimeout(config.getTimeout());
+        copy.setJdbcUrl(config.getJdbcUrl());
+        copy.setPoolConfig(config.getPoolConfig());
+        return copy;
     }
 }
