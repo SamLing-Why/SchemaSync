@@ -179,20 +179,20 @@ public class OracleAdapter implements DatabaseAdapter {
                     String dataType = rs.getString("DATA_TYPE");
                     column.setDataType(dataType);
                     
-                    // 长度(字符类型)
-                    int dataLength = rs.getInt("DATA_LENGTH");
+                    // 长度(字符类型) - 使用Long支持超大值
+                    long dataLength = rs.getLong("DATA_LENGTH");
                     if (!rs.wasNull() && isCharType(dataType)) {
                         column.setLength(dataLength);
                     }
                     
                     // 精度
-                    int precision = rs.getInt("DATA_PRECISION");
+                    long precision = rs.getLong("DATA_PRECISION");
                     if (!rs.wasNull()) {
                         column.setPrecision(precision);
                     }
                     
                     // 小数位
-                    int scale = rs.getInt("DATA_SCALE");
+                    long scale = rs.getLong("DATA_SCALE");
                     if (!rs.wasNull()) {
                         column.setScale(scale);
                     }

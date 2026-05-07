@@ -65,7 +65,7 @@ echo [6/6] 生成启动脚本和文档...
 
 REM 使用PowerShell创建文件（避免批处理转义问题）
 powershell -Command "if (!(Test-Path 'deploy\start.bat')) { '@echo off`nchcp 65001 >nul`nREM SchemaSync Start Script`njava -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml`npause' | Out-File -FilePath 'deploy\start.bat' -Encoding ASCII }"
-powershell -Command "if (!(Test-Path 'deploy\start.sh')) { '#!/bin/bash`n# SchemaSync Start Script`njava -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml' | Out-File -FilePath 'deploy\start.sh' -Encoding ASCII }"
+powershell -Command "if (!(Test-Path 'deploy\start.sh')) { '#!/bin/bash`n# ========================================`n# SchemaSync 启动脚本 (Linux)`n# ========================================`n`necho \"\"`necho \"========================================\"`necho \"  SchemaSync 启动中...\"`necho \"========================================\"`necho \"\"`necho \"访问地址: http://localhost:8999\"`necho \"\"`n`n# 使用nohup后台运行`nnohup java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml > app.log 2>&1 &`n`necho \"应用已在后台启动\"`necho \"PID: $!\"`necho \"日志: tail -f app.log\"`necho \"\"`necho \"停止服务: kill $! 或 pkill -f schemasync.jar\"' | Out-File -FilePath 'deploy\start.sh' -Encoding ASCII }"
 powershell -Command "if (!(Test-Path 'deploy\DEPLOY.md')) { '# SchemaSync Deploy Guide`n`n## Requirements`n- JDK 8+`n- 512MB+ RAM`n`n## Usage`n- Windows: start.bat`n- Linux: ./start.sh' | Out-File -FilePath 'deploy\DEPLOY.md' -Encoding UTF8 }"
 
 echo [成功] 启动脚本和文档生成完成
@@ -88,7 +88,7 @@ echo   2. Windows: 双击 start.bat
 echo   3. Linux:   chmod +x start.sh ^&^& ./start.sh
 echo.
 echo 访问地址:
-echo   http://服务器IP:8080
+echo   http://服务器IP:8999
 echo.
 echo ========================================
 echo.

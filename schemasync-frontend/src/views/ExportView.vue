@@ -7,7 +7,7 @@
 
       <el-form :model="form" label-width="120px">
         <el-form-item label="数据源">
-          <el-select v-model="form.configName" placeholder="请选择数据源" @change="loadDatabases">
+          <el-select v-model="form.configName" placeholder="请选择数据源" @change="onDataSourceChange">
             <el-option
               v-for="ds in dataSources"
               :key="ds.id"
@@ -18,7 +18,25 @@
         </el-form-item>
 
         <el-form-item label="数据库">
-          <el-input v-model="form.database" placeholder="请输入数据库名" />
+          <el-select 
+            v-model="form.database" 
+            placeholder="请选择或输入数据库名" 
+            :loading="loadingDatabases"
+            filterable
+            allow-create
+            default-first-option
+            @focus="onDatabaseFocus"
+          >
+            <el-option
+              v-for="db in databaseList"
+              :key="db"
+              :label="db"
+              :value="db"
+            />
+          </el-select>
+          <div v-if="databaseList.length === 0 && !loadingDatabases" style="color: #909399; font-size: 12px; margin-top: 5px;">
+            选择数据源后将自动加载数据库列表
+          </div>
         </el-form-item>
 
         <el-form-item label="导出格式">
@@ -43,10 +61,13 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import { getDataSources } from '../api/config'
+import { getDataSources, getDatabases } from '../api/config'
 
 const dataSources = ref([])
+const databaseList = ref([])
+const loadingDatabases = ref(false)
 const exporting = ref(false)
+const databasesLoaded = ref(false) // 标记是否已加载过数据库列表
 
 const form = ref({
   configName: '',
@@ -66,8 +87,43 @@ const loadDataSources = async () => {
   }
 }
 
-const loadDatabases = () => {
-  // 可以在这里根据数据源加载数据库列表
+// 数据源改变时加载数据库列表
+const onDataSourceChange = async () => {
+  // 清空数据库选择和列表
+  form.value.database = ''
+  databaseList.value = []
+  databasesLoaded.value = false
+  
+  // 自动加载数据库列表
+  await loadDatabases()
+}
+
+// 加载数据库列表
+const loadDatabases = async () => {
+  if (!form.value.configName) {
+    ElMessage.warning('请先选择数据源')
+    return
+  }
+  
+  loadingDatabases.value = true
+  try {
+    const databases = await getDatabases(form.value.configName)
+    databaseList.value = databases
+    databasesLoaded.value = true
+    ElMessage.success(`加载了 ${databases.length} 个数据库`)
+  } catch (error) {
+    ElMessage.error('加载数据库列表失败: ' + (error.message || '未知错误'))
+    databaseList.value = []
+  } finally {
+    loadingDatabases.value = false
+  }
+}
+
+// 数据库下拉框获得焦点时加载
+const onDatabaseFocus = () => {
+  if (!databasesLoaded.value && form.value.configName) {
+    loadDatabases()
+  }
 }
 
 const handleExport = async () => {
@@ -90,10 +146,35 @@ const handleExport = async () => {
     })
 
     if (!response.ok) {
-      throw new Error('导出失败')
+      // 尝试读取错误信息
+      let errorMsg = '导出失败'
+      try {
+        const errorData = await response.json()
+        if (errorData.message) {
+          errorMsg = errorData.message
+        } else if (errorData.error) {
+          errorMsg = errorData.error
+        }
+      } catch (e) {
+        // 如果无法解析JSON，使用HTTP状态码
+        errorMsg = `导出失败 (HTTP ${response.status})`
+      }
+      throw new Error(errorMsg)
     }
 
     const blob = await response.blob()
+    
+    // 检查是否是错误响应（可能返回的是JSON而不是文件）
+    if (blob.type && blob.type.includes('application/json')) {
+      const errorText = await blob.text()
+      try {
+        const errorData = JSON.parse(errorText)
+        throw new Error(errorData.message || errorData.error || '导出失败')
+      } catch (e) {
+        throw new Error('导出失败')
+      }
+    }
+    
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -106,7 +187,7 @@ const handleExport = async () => {
 
     ElMessage.success('导出成功')
   } catch (error) {
-    ElMessage.error('导出失败: ' + error.message)
+    ElMessage.error('导出失败: ' + (error.message || '未知错误'))
   } finally {
     exporting.value = false
   }

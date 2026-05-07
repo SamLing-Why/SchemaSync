@@ -182,20 +182,20 @@ public class OceanBaseAdapter implements DatabaseAdapter {
                     column.setColumnName(rs.getString("COLUMN_NAME"));
                     column.setDataType(rs.getString("DATA_TYPE"));
                     
-                    // 长度
-                    int length = rs.getInt("CHARACTER_MAXIMUM_LENGTH");
+                    // 长度 - 使用Long支持超大值
+                    long length = rs.getLong("CHARACTER_MAXIMUM_LENGTH");
                     if (!rs.wasNull()) {
                         column.setLength(length);
                     }
                     
                     // 精度
-                    int precision = rs.getInt("NUMERIC_PRECISION");
+                    long precision = rs.getLong("NUMERIC_PRECISION");
                     if (!rs.wasNull()) {
                         column.setPrecision(precision);
                     }
                     
                     // 小数位
-                    int scale = rs.getInt("NUMERIC_SCALE");
+                    long scale = rs.getLong("NUMERIC_SCALE");
                     if (!rs.wasNull()) {
                         column.setScale(scale);
                     }

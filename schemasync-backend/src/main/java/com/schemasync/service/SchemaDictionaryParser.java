@@ -175,12 +175,12 @@ public class SchemaDictionaryParser {
             
             String lengthStr = getCellStringValue(row.getCell(3));
             if (!lengthStr.isEmpty()) {
-                column.setLength(Integer.parseInt(lengthStr));
+                column.setLength(Long.parseLong(lengthStr));
             }
             
             String precisionStr = getCellStringValue(row.getCell(4));
             if (!precisionStr.isEmpty()) {
-                column.setPrecision(Integer.parseInt(precisionStr));
+                column.setPrecision(Long.parseLong(precisionStr));
             }
             
             String nullableStr = getCellStringValue(row.getCell(5));

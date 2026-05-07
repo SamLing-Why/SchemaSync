@@ -37,3 +37,8 @@ export function testConnection(config) {
   // 否则测试临时配置(新增/编辑时)
   return request.post('/config/datasources/test', config)
 }
+
+// 获取数据库列表(根据配置名称)
+export function getDatabases(configName) {
+  return request.get('/export/databases', { params: { configName } })
+}

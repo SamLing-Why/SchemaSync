@@ -24,14 +24,14 @@ public class ColumnInfoRow {
     private String dataType;
     
     /**
-     * 长度
+     * 长度 - 使用Long支持超大值
      */
-    private Integer length;
+    private Long length;
     
     /**
-     * 精度(数值型字段)
+     * 精度(数值型字段) - 使用Long支持超大值
      */
-    private Integer precision;
+    private Long precision;
     
     /**
      * 是否允许NULL
@@ -69,10 +69,10 @@ public class ColumnInfoRow {
     public void setColumnName(String columnName) { this.columnName = columnName; }
     public String getDataType() { return dataType; }
     public void setDataType(String dataType) { this.dataType = dataType; }
-    public Integer getLength() { return length; }
-    public void setLength(Integer length) { this.length = length; }
-    public Integer getPrecision() { return precision; }
-    public void setPrecision(Integer precision) { this.precision = precision; }
+    public Long getLength() { return length; }
+    public void setLength(Long length) { this.length = length; }
+    public Long getPrecision() { return precision; }
+    public void setPrecision(Long precision) { this.precision = precision; }
     public Boolean getNullable() { return nullable; }
     public void setNullable(Boolean nullable) { this.nullable = nullable; }
     public Object getDefaultValue() { return defaultValue; }

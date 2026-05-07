@@ -494,7 +494,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
     /**
      * 判断长度是否缩小
      */
-    private boolean isLengthDecreased(Integer oldLength, Integer newLength) {
+    private boolean isLengthDecreased(Long oldLength, Long newLength) {
         if (oldLength == null || newLength == null) {
             return false;
         }
