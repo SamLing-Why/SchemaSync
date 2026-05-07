@@ -110,7 +110,7 @@ class DefaultSchemaDifferTest {
         ColumnDefinition newColumn = new ColumnDefinition();
         newColumn.setColumnName("avatar");
         newColumn.setDataType("VARCHAR");
-        newColumn.setLength(255);
+        newColumn.setLength(255L);
         newColumn.setNullable(true);
         newColumn.setComment("头像URL");
         userTable.getColumns().add(newColumn);
@@ -203,7 +203,7 @@ class DefaultSchemaDifferTest {
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
                 .orElseThrow();
-        usernameColumn.setLength(100); // 50 -> 100
+        usernameColumn.setLength(100L); // 50 -> 100
 
         // 执行
         SchemaDiff diff = differ.compare(oldDict, newDict);
@@ -232,7 +232,7 @@ class DefaultSchemaDifferTest {
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
                 .orElseThrow();
-        usernameColumn.setLength(30); // 50 -> 30 (缩小)
+        usernameColumn.setLength(30L); // 50 -> 30 (缩小)
 
         // 执行
         SchemaDiff diff = differ.compare(oldDict, newDict);
@@ -300,7 +300,7 @@ class DefaultSchemaDifferTest {
         ColumnDefinition phoneColumn = new ColumnDefinition();
         phoneColumn.setColumnName("phone");
         phoneColumn.setDataType("VARCHAR");
-        phoneColumn.setLength(20);
+        phoneColumn.setLength(20L);
         userTable.getColumns().add(phoneColumn);
         
         // 4. 删除字段
@@ -311,7 +311,7 @@ class DefaultSchemaDifferTest {
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
                 .orElseThrow();
-        usernameColumn.setLength(100);
+        usernameColumn.setLength(100L);
 
         // 执行
         SchemaDiff diff = differ.compare(oldDict, newDict);
@@ -424,13 +424,13 @@ class DefaultSchemaDifferTest {
         ColumnDefinition usernameColumn = new ColumnDefinition();
         usernameColumn.setColumnName("username");
         usernameColumn.setDataType("VARCHAR");
-        usernameColumn.setLength(50);
+        usernameColumn.setLength(50L);
         usernameColumn.setNullable(false);
 
         ColumnDefinition emailColumn = new ColumnDefinition();
         emailColumn.setColumnName("email");
         emailColumn.setDataType("VARCHAR");
-        emailColumn.setLength(100);
+        emailColumn.setLength(100L);
         emailColumn.setNullable(true);
 
         ColumnDefinition ageColumn = new ColumnDefinition();

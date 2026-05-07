@@ -183,7 +183,7 @@ class JsonFormatterTest {
         ColumnDefinition nameColumn = new ColumnDefinition();
         nameColumn.setColumnName("username");
         nameColumn.setDataType("VARCHAR");
-        nameColumn.setLength(50);
+        nameColumn.setLength(50L);
         nameColumn.setNullable(false);
 
         table.setColumns(Arrays.asList(idColumn, nameColumn));

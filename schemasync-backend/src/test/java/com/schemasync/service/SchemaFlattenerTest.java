@@ -98,9 +98,9 @@ class SchemaFlattenerTest {
         userTable.setCharset("utf8mb4");
         
         List<ColumnDefinition> userColumns = new ArrayList<>();
-        userColumns.add(createColumn("id", "BIGINT", null, 20, null, false, null, true, true, "主键"));
-        userColumns.add(createColumn("username", "VARCHAR", 100, null, null, false, null, false, false, "用户名"));
-        userColumns.add(createColumn("email", "VARCHAR", 200, null, null, true, null, false, false, "邮箱"));
+        userColumns.add(createColumn("id", "BIGINT", null, 20L, null, false, null, true, true, "主键"));
+        userColumns.add(createColumn("username", "VARCHAR", 100L, null, null, false, null, false, false, "用户名"));
+        userColumns.add(createColumn("email", "VARCHAR", 200L, null, null, true, null, false, false, "邮箱"));
         userTable.setColumns(userColumns);
         
         List<IndexDefinition> userIndexes = new ArrayList<>();
@@ -118,8 +118,8 @@ class SchemaFlattenerTest {
         orderTable.setEngine("InnoDB");
         
         List<ColumnDefinition> orderColumns = new ArrayList<>();
-        orderColumns.add(createColumn("id", "BIGINT", null, 20, null, false, null, true, true, "主键"));
-        orderColumns.add(createColumn("user_id", "BIGINT", null, 20, null, false, null, false, false, "用户ID"));
+        orderColumns.add(createColumn("id", "BIGINT", null, 20L, null, false, null, true, true, "主键"));
+        orderColumns.add(createColumn("user_id", "BIGINT", null, 20L, null, false, null, false, false, "用户ID"));
         orderTable.setColumns(orderColumns);
         
         List<ForeignKeyDefinition> orderFks = new ArrayList<>();
@@ -140,8 +140,8 @@ class SchemaFlattenerTest {
         return dictionary;
     }
     
-    private ColumnDefinition createColumn(String name, String type, Integer length, 
-                                          Integer precision, Integer scale, Boolean nullable,
+    private ColumnDefinition createColumn(String name, String type, Long length, 
+                                          Long precision, Long scale, Boolean nullable,
                                           Object defaultValue, Boolean isPrimaryKey, 
                                           Boolean isAutoIncrement, String comment) {
         ColumnDefinition column = new ColumnDefinition();
