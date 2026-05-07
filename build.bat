@@ -52,12 +52,23 @@ echo [成功] 部署目录就绪
 
 REM 复制文件
 echo.
-echo [5/5] 复制部署文件...
+echo [5/6] 复制部署文件...
 copy /Y schemasync-backend\target\schemasync-backend-1.0.0-SNAPSHOT.jar deploy\schemasync.jar >nul
 if exist schemasync-backend\src\main\resources\application.yml (
     copy /Y schemasync-backend\src\main\resources\application.yml deploy\application.yml >nul
 )
 echo [成功] 文件复制完成
+
+REM 创建启动脚本
+echo.
+echo [6/6] 生成启动脚本和文档...
+
+REM 使用PowerShell创建文件（避免批处理转义问题）
+powershell -Command "if (!(Test-Path 'deploy\start.bat')) { '@echo off`nchcp 65001 >nul`nREM SchemaSync Start Script`njava -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml`npause' | Out-File -FilePath 'deploy\start.bat' -Encoding ASCII }"
+powershell -Command "if (!(Test-Path 'deploy\start.sh')) { '#!/bin/bash`n# SchemaSync Start Script`njava -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml' | Out-File -FilePath 'deploy\start.sh' -Encoding ASCII }"
+powershell -Command "if (!(Test-Path 'deploy\DEPLOY.md')) { '# SchemaSync Deploy Guide`n`n## Requirements`n- JDK 8+`n- 512MB+ RAM`n`n## Usage`n- Windows: start.bat`n- Linux: ./start.sh' | Out-File -FilePath 'deploy\DEPLOY.md' -Encoding UTF8 }"
+
+echo [成功] 启动脚本和文档生成完成
 
 echo.
 echo ========================================
