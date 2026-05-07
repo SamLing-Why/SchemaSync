@@ -46,6 +46,7 @@ logs/
 
 # Build
 build/
+deploy/
 *.orig
 
 # Temporary files
