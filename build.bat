@@ -63,10 +63,26 @@ REM 创建启动脚本
 echo.
 echo [6/6] 生成启动脚本和文档...
 
-REM 使用PowerShell创建文件（避免批处理转义问题）
-powershell -Command "if (!(Test-Path 'deploy\start.bat')) { '@echo off`nchcp 65001 >nul`nREM SchemaSync Start Script`njava -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml`npause' | Out-File -FilePath 'deploy\start.bat' -Encoding ASCII }"
-powershell -Command "if (!(Test-Path 'deploy\start.sh')) { '#!/bin/bash`n# ========================================`n# SchemaSync 启动脚本 (Linux)`n# ========================================`n`necho \"\"`necho \"========================================\"`necho \"  SchemaSync 启动中...\"`necho \"========================================\"`necho \"\"`necho \"访问地址: http://localhost:8999\"`necho \"\"`n`n# 使用nohup后台运行`nnohup java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml > app.log 2>&1 &`n`necho \"应用已在后台启动\"`necho \"PID: $!\"`necho \"日志: tail -f app.log\"`necho \"\"`necho \"停止服务: kill $! 或 pkill -f schemasync.jar\"' | Out-File -FilePath 'deploy\start.sh' -Encoding ASCII }"
-powershell -Command "if (!(Test-Path 'deploy\DEPLOY.md')) { '# SchemaSync Deploy Guide`n`n## Requirements`n- JDK 8+`n- 512MB+ RAM`n`n## Usage`n- Windows: start.bat`n- Linux: ./start.sh' | Out-File -FilePath 'deploy\DEPLOY.md' -Encoding UTF8 }"
+REM 创建start.bat
+if not exist deploy\start.bat (
+    (
+        echo @echo off
+        echo chcp 65001 ^>nul
+        echo REM SchemaSync Start Script
+        echo java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml
+        echo pause
+    ) > deploy\start.bat
+)
+
+REM 创建start.sh
+if not exist deploy\start.sh (
+    powershell -Command "Set-Content -Path 'deploy\start.sh' -Value @'`n#!/bin/bash`n# ========================================`n# SchemaSync 启动脚本 (Linux)`n# ========================================`n`necho `"`"`necho `"`========================================`"`necho `"`  SchemaSync 启动中...`"`necho `"`========================================`"`necho `"`"`necho `"`访问地址: http://localhost:8999`"`necho `"`"`n`n# 使用nohup后台运行`nnohup java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml ^> app.log 2^>^&1 ^&`n`necho `"`应用已在后台启动`"`necho `"`PID: `$!`"`necho `"`日志: tail -f app.log`"`necho `"`"`necho `"`停止服务: kill `$! 或 pkill -f schemasync.jar`"`n'@ -Encoding UTF8"
+)
+
+REM 创建DEPLOY.md
+if not exist deploy\DEPLOY.md (
+    powershell -Command "Set-Content -Path 'deploy\DEPLOY.md' -Value @'`n# SchemaSync Deploy Guide`n`n## Requirements`n- JDK 8+`n- 512MB+ RAM`n`n## Usage`n- Windows: start.bat`n- Linux: ./start.sh`n'@ -Encoding UTF8"
+)
 
 echo [成功] 启动脚本和文档生成完成
 
