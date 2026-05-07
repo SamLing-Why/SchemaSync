@@ -178,45 +178,59 @@ const loadDataSources = async () => {
 const showAddDialog = () => {
   isEditMode.value = false
   dialogTitle.value = '新增数据源'
-  form.value = {
-    id: null,
-    name: '',
-    type: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    database: '',
-    username: '',
-    password: '',
-    jdbcUrl: '',
-    poolConfig: ''
-  }
+  
+  // 先打开对话框
   dialogVisible.value = true
-  // 重置表单验证
+  
+  // 等待DOM更新后再重置表单
   setTimeout(() => {
-    if (formRef.value) formRef.value.resetFields()
-  }, 0)
+    form.value = {
+      id: null,
+      name: '',
+      type: 'mysql',
+      host: 'localhost',
+      port: 3306,
+      database: '',
+      username: '',
+      password: '',
+      jdbcUrl: '',
+      poolConfig: ''
+    }
+    
+    // 重置表单验证
+    if (formRef.value) {
+      formRef.value.resetFields()
+    }
+  }, 100)
 }
 
 const showEditDialog = (row) => {
   isEditMode.value = true
   dialogTitle.value = '编辑数据源'
-  form.value = {
-    id: row.id,
-    name: row.name,
-    type: row.type,
-    host: row.host,
-    port: row.port,
-    database: row.database,
-    username: row.username,
-    password: '', // 密码不回填
-    jdbcUrl: row.jdbcUrl || '',
-    poolConfig: row.poolConfig || ''
-  }
+  
+  // 先打开对话框
   dialogVisible.value = true
-  // 重置表单验证
+  
+  // 等待DOM更新后再设置表单值
   setTimeout(() => {
-    if (formRef.value) formRef.value.resetFields()
-  }, 0)
+    form.value = {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      host: row.host,
+      port: row.port,
+      database: row.database,
+      username: row.username,
+      password: '', // 密码不回填
+      jdbcUrl: row.jdbcUrl || '',
+      poolConfig: row.poolConfig || ''
+    }
+    
+    // 清除验证状态，但不重置字段值
+    if (formRef.value) {
+      formRef.value.clearValidate()
+    }
+  }, 100)
 }
 
 // 在表单中测试连接

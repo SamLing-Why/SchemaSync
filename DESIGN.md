@@ -1613,6 +1613,7 @@ chmod +x build.sh
 ```
 
 **构建流程**：
+
 1. 检查Java和Maven环境
 2. 清理旧构建 (`mvn clean`)
 3. Maven打包（自动构建前端）
@@ -1638,6 +1639,7 @@ deploy/
 ### 10.3 部署步骤
 
 **Windows服务器**：
+
 ```batch
 # 1. 复制 deploy 目录到服务器
 # 2. 双击 start.bat 启动
@@ -1645,6 +1647,7 @@ deploy/
 ```
 
 **Linux服务器**：
+
 ```bash
 # 1. 复制 deploy 目录到服务器
 # 2. 赋权并启动
@@ -1660,11 +1663,13 @@ nohup java -jar schemasync.jar --spring.config.location=application.yml > /dev/n
 ### 10.4 环境要求
 
 **构建环境**：
+
 - JDK: 8 或更高版本
 - Maven: 3.6 或更高版本
 - Node.js: 16+ (由Maven自动管理)
 
 **运行环境**：
+
 - JDK: 8 或更高版本
 - 内存: 至少 512MB
 - 磁盘: 至少 200MB
@@ -1675,21 +1680,22 @@ nohup java -jar schemasync.jar --spring.config.location=application.yml > /dev/n
 
 ```yaml
 server:
-  port: 8080  # 可自定义端口
+  port: 8080 # 可自定义端口
 
 schemasync:
-  default-output-dir: ./output  # 导出文件目录
-  max-pool-size: 10             # 连接池大小
-  connection-timeout: 30        # 连接超时
+  default-output-dir: ./output # 导出文件目录
+  max-pool-size: 10 # 连接池大小
+  connection-timeout: 30 # 连接超时
 
 logging:
   level:
-    com.schemasync: DEBUG  # 日志级别
+    com.schemasync: DEBUG # 日志级别
   file:
-    name: logs/schemasync.log  # 日志文件
+    name: logs/schemasync.log # 日志文件
 ```
 
 **数据源配置**：
+
 - 位置: `~/.schemasync/schemasync-config.json`
 - 格式: JSON
 - 支持动态添加和修改
@@ -1701,6 +1707,7 @@ logging:
 ### v1.0.0-SNAPSHOT (2026-04-29)
 
 **核心功能**：
+
 - ✅ 多数据库适配器（6种数据库）
 - ✅ 数据字典导出（JSON/Excel）
 - ✅ 版本对比与差异分析
@@ -1709,6 +1716,7 @@ logging:
 - ✅ 外置配置支持
 
 **主要改进**：
+
 - 索引变更完整支持（INDEX_ADD/INDEX_DROP/INDEX_MODIFY）
 - Excel导出详情格式化
 - DDL生成精度优化
@@ -1716,6 +1724,7 @@ logging:
 - 部署包自动生成
 
 **已知问题**：
+
 - 无
 
 ---
@@ -1738,15 +1747,15 @@ logging:
 
 ### B. 技术栈版本
 
-| 组件 | 版本 |
-|------|------|
-| Spring Boot | 2.7.18 |
-| Vue | 3.x |
-| Vite | 5.4.21 |
-| Element Plus | 2.x |
-| Apache POI | 5.2.5 |
-| FastJSON2 | 2.0.42 |
-| HikariCP | 5.0.1 |
+| 组件         | 版本   |
+| ------------ | ------ |
+| Spring Boot  | 2.7.18 |
+| Vue          | 3.x    |
+| Vite         | 5.4.21 |
+| Element Plus | 2.x    |
+| Apache POI   | 5.2.5  |
+| FastJSON2    | 2.0.42 |
+| HikariCP     | 5.0.1  |
 
 ---
 
