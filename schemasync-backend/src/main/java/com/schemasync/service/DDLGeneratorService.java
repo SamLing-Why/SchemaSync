@@ -41,7 +41,14 @@ public class DdlGeneratorService {
             if ("excel".equals(fileType)) {
                 dictionary = parser.parseExcel(inputStream);
             } else {
-                dictionary = parser.parseJson(inputStream.readAllBytes());
+                // Java 8兼容: 使用ByteArrayOutputStream读取所有字节
+                java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, length);
+                }
+                dictionary = parser.parseJson(outputStream.toByteArray());
             }
             
             return generateDdlFromDictionary(dictionary);

@@ -44,7 +44,7 @@ class SchemaFlattenerTest {
         // 验证字段包含表名
         List<ColumnInfoRow> userColumns = flat.getColumns().stream()
                 .filter(col -> "user".equals(col.getTableName()))
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
         assertEquals(3, userColumns.size());
         
         // 验证索引信息

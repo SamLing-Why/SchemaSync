@@ -58,6 +58,6 @@ public class DatabaseAdapterFactory {
      * 获取所有支持的数据库类型
      */
     public List<String> getSupportedTypes() {
-        return List.copyOf(adapterMap.keySet());
+        return new java.util.ArrayList<>(adapterMap.keySet());
     }
 }

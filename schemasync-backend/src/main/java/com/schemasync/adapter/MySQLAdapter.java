@@ -321,7 +321,7 @@ public class MySQLAdapter implements DatabaseAdapter {
         String regex = pattern.replace("*", ".*").replace("?", ".");
         return tables.stream()
                 .filter(t -> t.getTableName().matches(regex))
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**
@@ -334,6 +334,6 @@ public class MySQLAdapter implements DatabaseAdapter {
                             String regex = pattern.replace("*", ".*").replace("?", ".");
                             return t.getTableName().matches(regex);
                         }))
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
     }
 }

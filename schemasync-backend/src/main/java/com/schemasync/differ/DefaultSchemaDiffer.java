@@ -73,7 +73,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                         .changeType(ChangeType.TABLE_ADD)
                         .tableName(tableName)
                         .severity(Severity.NON_BREAKING)
-                        .details(Map.of(
+                        .details(createMap(
                                 "tableComment", newTableMap.get(tableName).getTableComment(),
                                 "columns", newTableMap.get(tableName).getColumns().size(),
                                 "indexes", newTableMap.get(tableName).getIndexes() != null ? 
@@ -91,7 +91,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                         .changeType(ChangeType.TABLE_DROP)
                         .tableName(tableName)
                         .severity(Severity.BREAKING)
-                        .details(Map.of(
+                        .details(createMap(
                                 "tableComment", oldTableMap.get(tableName).getTableComment()
                         ))
                         .build());
@@ -181,7 +181,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                         .tableName(tableName)
                         .columnName(columnName)
                         .severity(Severity.BREAKING)
-                        .details(Map.of(
+                        .details(createMap(
                                 "oldDefinition", oldColumnMap.get(columnName)
                         ))
                         .build());
@@ -218,7 +218,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(Severity.BREAKING)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "dataType",
                             "oldValue", oldCol.getDataType(),
                             "newValue", newCol.getDataType(),
@@ -236,7 +236,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(severity)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "length",
                             "oldValue", oldCol.getLength(),
                             "newValue", newCol.getLength(),
@@ -252,7 +252,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(Severity.BREAKING)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "precision",
                             "oldValue", oldCol.getPrecision(),
                             "newValue", newCol.getPrecision()
@@ -267,7 +267,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(Severity.BREAKING)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "scale",
                             "oldValue", oldCol.getScale(),
                             "newValue", newCol.getScale()
@@ -284,7 +284,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(severity)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "nullable",
                             "oldValue", oldCol.getNullable(),
                             "newValue", newCol.getNullable(),
@@ -300,7 +300,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(Severity.NON_BREAKING)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "defaultValue",
                             "oldValue", oldCol.getDefaultValue(),
                             "newValue", newCol.getDefaultValue()
@@ -315,7 +315,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                     .tableName(tableName)
                     .columnName(columnName)
                     .severity(Severity.NON_BREAKING)
-                    .details(Map.of(
+                    .details(createMap(
                             "property", "comment",
                             "oldValue", oldCol.getComment(),
                             "newValue", newCol.getComment()
@@ -382,7 +382,7 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
                             .changeType(ChangeType.INDEX_MODIFY)
                             .tableName(tableName)
                             .severity(Severity.NON_BREAKING)
-                            .details(Map.of(
+                            .details(createMap(
                                     "indexName", indexName,
                                     "oldValue", oldIndex,
                                     "newValue", newIndex
@@ -499,5 +499,19 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
             return false;
         }
         return newLength < oldLength;
+    }
+
+    /**
+     * Java 8兼容的Map创建方法
+     */
+    @SafeVarargs
+    private final Map<String, Object> createMap(Object... keyValues) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < keyValues.length; i += 2) {
+            if (i + 1 < keyValues.length) {
+                map.put((String) keyValues[i], keyValues[i + 1]);
+            }
+        }
+        return map;
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -76,10 +77,10 @@ public class ConfigController {
         if (configId != null && !configId.trim().isEmpty()) {
             // 模式1: 测试已保存的配置
             boolean success = configService.testConnection(configId);
-            return ResponseEntity.ok(Map.of(
-                "success", success,
-                "message", success ? "连接成功" : "连接失败"
-            ));
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", success);
+            result.put("message", success ? "连接成功" : "连接失败");
+            return ResponseEntity.ok(result);
         } else {
             // 模式2: 测试临时配置(新增/编辑时)
             DataSourceConfig tempConfig = new DataSourceConfig();

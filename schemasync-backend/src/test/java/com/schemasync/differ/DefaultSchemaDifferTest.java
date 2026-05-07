@@ -105,7 +105,7 @@ class DefaultSchemaDifferTest {
         TableDefinition userTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         
         ColumnDefinition newColumn = new ColumnDefinition();
         newColumn.setColumnName("avatar");
@@ -139,7 +139,7 @@ class DefaultSchemaDifferTest {
         TableDefinition newUserTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         newUserTable.getColumns().removeIf(c -> "email".equals(c.getColumnName()));
 
         // 执行
@@ -166,11 +166,11 @@ class DefaultSchemaDifferTest {
         TableDefinition newUserTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ColumnDefinition ageColumn = newUserTable.getColumns().stream()
                 .filter(c -> "age".equals(c.getColumnName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ageColumn.setDataType("BIGINT"); // INT -> BIGINT
 
         // 执行
@@ -198,11 +198,11 @@ class DefaultSchemaDifferTest {
         TableDefinition newUserTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ColumnDefinition usernameColumn = newUserTable.getColumns().stream()
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         usernameColumn.setLength(100L); // 50 -> 100
 
         // 执行
@@ -227,11 +227,11 @@ class DefaultSchemaDifferTest {
         TableDefinition newUserTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ColumnDefinition usernameColumn = newUserTable.getColumns().stream()
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         usernameColumn.setLength(30L); // 50 -> 30 (缩小)
 
         // 执行
@@ -255,11 +255,11 @@ class DefaultSchemaDifferTest {
         TableDefinition newUserTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ColumnDefinition emailColumn = newUserTable.getColumns().stream()
                 .filter(c -> "email".equals(c.getColumnName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         emailColumn.setNullable(false); // true -> false
 
         // 执行
@@ -296,7 +296,7 @@ class DefaultSchemaDifferTest {
         TableDefinition userTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ColumnDefinition phoneColumn = new ColumnDefinition();
         phoneColumn.setColumnName("phone");
         phoneColumn.setDataType("VARCHAR");
@@ -310,7 +310,7 @@ class DefaultSchemaDifferTest {
         ColumnDefinition usernameColumn = userTable.getColumns().stream()
                 .filter(c -> "username".equals(c.getColumnName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         usernameColumn.setLength(100L);
 
         // 执行
@@ -359,7 +359,7 @@ class DefaultSchemaDifferTest {
         TableDefinition userTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         IndexDefinition newIndex = new IndexDefinition();
         newIndex.setIndexName("idx_username");
         newIndex.setIndexType("NORMAL");
@@ -387,7 +387,7 @@ class DefaultSchemaDifferTest {
         TableDefinition userTable = newDict.getTables().stream()
                 .filter(t -> "user".equals(t.getTableName()))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("Element not found"));
         ForeignKeyDefinition newFk = new ForeignKeyDefinition();
         newFk.setConstraintName("fk_user_dept");
         userTable.setForeignKeys(Arrays.asList(newFk));
