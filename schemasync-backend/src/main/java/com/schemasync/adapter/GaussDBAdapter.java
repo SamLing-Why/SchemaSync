@@ -25,23 +25,18 @@ public class GaussDBAdapter implements DatabaseAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(GaussDBAdapter.class);
 
-    // GaussDB使用PostgreSQL兼容模式，补充表类型和创建时间
+    // 使用information_schema.tables，兼容性更好
+    // GaussDB 9.2.4支持表注释，使用obj_description获取
     private static final String QUERY_TABLES = 
         "SELECT " +
-        "    t.tablename AS TABLE_NAME, " +
-        "    obj_description((t.schemaname || '.' || t.tablename)::regclass) AS TABLE_COMMENT, " +
-        "    CASE c.relkind " +
-        "        WHEN 'r' THEN 'BASE TABLE' " +
-        "        WHEN 'v' THEN 'VIEW' " +
-        "        WHEN 'm' THEN 'MATERIALIZED VIEW' " +
-        "        ELSE 'UNKNOWN' " +
-        "    END AS TABLE_TYPE, " +
-        "    NULL AS CREATE_TIME " +  // GaussDB不直接提供表创建时间
-        "FROM pg_tables t " +
-        "JOIN pg_class c ON c.relname = t.tablename " +
-        "JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = t.schemaname " +
-        "WHERE t.schemaname = ? " +
-        "ORDER BY t.tablename";
+        "    t.table_name AS TABLE_NAME, " +
+        "    obj_description((t.table_schema || '.' || t.table_name)::regclass, 'pg_class') AS TABLE_COMMENT, " +
+        "    t.table_type AS TABLE_TYPE, " +
+        "    NULL AS CREATE_TIME " +
+        "FROM information_schema.tables t " +
+        "WHERE t.table_schema = ? " +
+        "  AND t.table_type IN ('BASE TABLE', 'VIEW') " +
+        "ORDER BY t.table_name";
 
     private static final String QUERY_COLUMNS = 
         "SELECT " +
@@ -134,8 +129,9 @@ public class GaussDBAdapter implements DatabaseAdapter {
     }
 
     /**
-     * 获取SCHEMA列表(GaussDB特有)
+     * 获取SCHEMA列表(GaussDB/OpenGauss特有)
      * GaussDB层级: 数据库 → SCHEMA → 表
+     * OpenGauss: 默认只有public SCHEMA，支持手动创建多SCHEMA
      */
     public List<String> getSchemas(Connection conn) throws SQLException {
         List<String> schemas = new ArrayList<>();
@@ -147,9 +143,18 @@ public class GaussDBAdapter implements DatabaseAdapter {
                  "AND nspname NOT LIKE 'pg_toast_temp_%' " +
                  "ORDER BY nspname")) {
             while (rs.next()) {
-                schemas.add(rs.getString("nspname"));
+                String schemaName = rs.getString("nspname");
+                schemas.add(schemaName);
             }
         }
+        
+        log.info("OpenGauss/GaussDB查询到 {} 个SCHEMA: {}", schemas.size(), schemas);
+        
+        // 如果没有找到任何SCHEMA，默认返回public
+        if (schemas.isEmpty()) {
+            schemas.add("public");
+        }
+        
         return schemas;
     }
 
@@ -200,6 +205,7 @@ public class GaussDBAdapter implements DatabaseAdapter {
                 log.info("GaussDB使用用户指定的schema: {}", schema);
             }
             
+            log.info("GaussDB开始查询表列表, schema: {}", schema);
             List<TableDefinition> tables = getTables(conn, schema);
             log.info("GaussDB获取到{}张表", tables.size());
             

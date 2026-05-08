@@ -89,6 +89,11 @@ public class DataSourceConfig {
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date updateTime;
+    
+    /**
+     * 是否支持SCHEMA层级(由适配器动态设置,不持久化)
+     */
+    private transient Boolean supportsSchema;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -118,4 +123,6 @@ public class DataSourceConfig {
     public void setCreateTime(Date createTime) { this.createTime = createTime; }
     public Date getUpdateTime() { return updateTime; }
     public void setUpdateTime(Date updateTime) { this.updateTime = updateTime; }
+    public Boolean getSupportsSchema() { return supportsSchema; }
+    public void setSupportsSchema(Boolean supportsSchema) { this.supportsSchema = supportsSchema; }
 }

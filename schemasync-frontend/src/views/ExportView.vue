@@ -102,9 +102,7 @@ const form = ref({
 // 计算是否显示SCHEMA选择框
 const showSchemaSelect = computed(() => {
   return currentDataSource.value && 
-         (currentDataSource.value.type === 'GAUSSDB' || 
-          currentDataSource.value.type === 'OPENGAUSS' ||
-          currentDataSource.value.type === 'POSTGRESQL')
+         currentDataSource.value.supportsSchema === true
 })
 
 onMounted(() => {

@@ -76,12 +76,44 @@ if not exist deploy\start.bat (
 
 REM 创建start.sh
 if not exist deploy\start.sh (
-    powershell -Command "Set-Content -Path 'deploy\start.sh' -Value @'`n#!/bin/bash`n# ========================================`n# SchemaSync 启动脚本 (Linux)`n# ========================================`n`necho `"`"`necho `"`========================================`"`necho `"`  SchemaSync 启动中...`"`necho `"`========================================`"`necho `"`"`necho `"`访问地址: http://localhost:8999`"`necho `"`"`n`n# 使用nohup后台运行`nnohup java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml ^> app.log 2^>^&1 ^&`n`necho `"`应用已在后台启动`"`necho `"`PID: `$!`"`necho `"`日志: tail -f app.log`"`necho `"`"`necho `"`停止服务: kill `$! 或 pkill -f schemasync.jar`"`n'@ -Encoding UTF8"
+    (
+        echo #!/bin/bash
+        echo # ========================================
+        echo # SchemaSync 启动脚本 ^(Linux^)
+        echo # ========================================
+        echo.
+        echo echo ""
+        echo echo "========================================"
+        echo echo "  SchemaSync 启动中..."
+        echo echo "========================================"
+        echo echo ""
+        echo echo "访问地址: http://localhost:8999"
+        echo echo ""
+        echo.
+        echo # 使用nohup后台运行
+        echo nohup java -jar -Xms256m -Xmx512m schemasync.jar --spring.config.location=application.yml ^> app.log 2^>^&1 ^&
+        echo.
+        echo echo "应用已在后台启动"
+        echo echo "PID: $!"
+        echo echo "日志: tail -f app.log"
+        echo echo ""
+        echo echo "停止服务: kill $! 或 pkill -f schemasync.jar"
+    ) > deploy\start.sh
 )
 
 REM 创建DEPLOY.md
 if not exist deploy\DEPLOY.md (
-    powershell -Command "Set-Content -Path 'deploy\DEPLOY.md' -Value @'`n# SchemaSync Deploy Guide`n`n## Requirements`n- JDK 8+`n- 512MB+ RAM`n`n## Usage`n- Windows: start.bat`n- Linux: ./start.sh`n'@ -Encoding UTF8"
+    (
+        echo # SchemaSync Deploy Guide
+        echo.
+        echo ## Requirements
+        echo - JDK 8+
+        echo - 512MB+ RAM
+        echo.
+        echo ## Usage
+        echo - Windows: start.bat
+        echo - Linux: ./start.sh
+    ) > deploy\DEPLOY.md
 )
 
 echo [成功] 启动脚本和文档生成完成

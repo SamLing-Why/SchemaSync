@@ -1,5 +1,6 @@
 package com.schemasync.controller;
 
+import com.schemasync.adapter.DatabaseAdapterFactory;
 import com.schemasync.model.config.DataSourceConfig;
 import com.schemasync.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,11 +26,28 @@ public class ConfigController {
 
     @Autowired
     private ConfigService configService;
+    
+    @Autowired
+    private DatabaseAdapterFactory adapterFactory;
 
     @GetMapping("/datasources")
     @Operation(summary = "获取所有数据源配置")
     public ResponseEntity<List<DataSourceConfig>> getAllConfigs() {
-        return ResponseEntity.ok(configService.getAllConfigs());
+        List<DataSourceConfig> configs = configService.getAllConfigs();
+        
+        // 为每个数据源设置supportsSchema标识
+        for (DataSourceConfig config : configs) {
+            try {
+                com.schemasync.adapter.DatabaseAdapter adapter = 
+                    adapterFactory.getAdapter(config.getType());
+                config.setSupportsSchema(adapter.supportsSchema());
+            } catch (Exception e) {
+                // 如果获取适配器失败，默认不支持SCHEMA
+                config.setSupportsSchema(false);
+            }
+        }
+        
+        return ResponseEntity.ok(configs);
     }
 
     @GetMapping("/datasources/{id}")
