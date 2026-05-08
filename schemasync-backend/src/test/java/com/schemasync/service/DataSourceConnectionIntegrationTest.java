@@ -83,6 +83,9 @@ class DataSourceConnectionIntegrationTest {
         
         assertTrue(dataSources.size() > 0, "至少应该有1个数据源配置");
         
+        int successCount = 0;
+        int failCount = 0;
+        
         // 遍历测试每个数据源
         for (DataSourceConfig ds : dataSources) {
             System.out.println("----------------------------------------");
@@ -90,27 +93,50 @@ class DataSourceConnectionIntegrationTest {
             System.out.println("  类型: " + ds.getType());
             System.out.println("  地址: " + ds.getHost() + ":" + ds.getPort());
             System.out.println("  数据库: " + ds.getDatabase());
-            System.out.println("  注意: 此测试需要能够访问地址 " + ds.getHost() + ":" + ds.getPort());
+            System.out.println("  用户名: " + ds.getUsername());
             
+            long startTime = System.currentTimeMillis();
             try {
-                long startTime = System.currentTimeMillis();
                 boolean success = configService.testConnection(ds.getId());
                 long elapsed = System.currentTimeMillis() - startTime;
                 
                 if (success) {
-                    System.out.println("  ✓ 连接测试成功 (耗时: " + elapsed + "ms)");
+                    System.out.println("  ✅ 连接测试: 成功");
+                    System.out.println("  ⏱️  耗时: " + elapsed + "ms");
+                    successCount++;
                 } else {
-                    System.out.println("  ⚠ 连接测试失败 - 可能无法访问目标地址 (耗时: " + elapsed + "ms)");
+                    System.out.println("  ❌ 连接测试: 失败");
+                    System.out.println("  ⏱️  耗时: " + elapsed + "ms");
+                    System.out.println("  📝 原因: testConnection()返回false，连接未建立");
+                    failCount++;
                 }
-                // 不强制断言，因为内网地址可能无法从当前网络访问
             } catch (Exception e) {
-                System.out.println("  ⚠ 连接测试异常 (可能是网络问题): " + e.getMessage());
-                // 记录异常但不失败，因为这是网络环境问题
+                long elapsed = System.currentTimeMillis() - startTime;
+                System.out.println("  ❌ 连接测试: 失败");
+                System.out.println("  ⏱️  耗时: " + elapsed + "ms");
+                System.out.println("  📝 异常类型: " + e.getClass().getSimpleName());
+                System.out.println("  📝 异常信息: " + e.getMessage());
+                
+                // 打印根本原因
+                Throwable cause = e.getCause();
+                if (cause != null) {
+                    System.out.println("  🔍 根本原因: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
+                }
+                
+                failCount++;
             }
         }
         
         System.out.println("----------------------------------------");
-        System.out.println("所有数据源连接测试完成");
+        System.out.println("连接测试汇总:");
+        System.out.println("  总计: " + dataSources.size() + " 个数据源");
+        System.out.println("  ✅ 成功: " + successCount + " 个");
+        System.out.println("  ❌ 失败: " + failCount + " 个");
+        
+        if (failCount > 0) {
+            System.out.println("  ⚠️  注意: 有 " + failCount + " 个数据源连接失败，请检查网络或配置");
+        }
+        System.out.println("----------------------------------------");
     }
 
     @Test
@@ -122,16 +148,19 @@ class DataSourceConnectionIntegrationTest {
         
         assertTrue(dataSources.size() > 0, "至少应该有1个数据源配置");
         
+        int successCount = 0;
+        int failCount = 0;
+        
         // 遍历检查每个数据源的密码加密状态
         for (DataSourceConfig ds : dataSources) {
-            System.out.println("检查数据源 '" + ds.getName() + "' 的密码加密状态");
+            System.out.println("----------------------------------------");
+            System.out.println("检查数据源: " + ds.getName());
             
             // 验证密码字段存在
             assertNotNull(ds.getPassword(), "数据源 '" + ds.getName() + "' 的密码不应为null");
             
             // 检查是否加密
             boolean isEncrypted = CryptoUtil.isEncrypted(ds.getPassword());
-            System.out.println("  数据源: " + ds.getName());
             System.out.println("  密码状态: " + (isEncrypted ? "已加密" : "明文"));
             
             if (isEncrypted) {
@@ -140,15 +169,35 @@ class DataSourceConnectionIntegrationTest {
                     String decryptedPassword = CryptoUtil.decrypt(ds.getPassword());
                     assertNotNull(decryptedPassword, "解密后的密码不应为null");
                     assertFalse(decryptedPassword.isEmpty(), "解密后的密码不应为空");
-                    System.out.println("  ✓ 密码解密成功 (解密后长度: " + decryptedPassword.length() + " 字符)");
+                    System.out.println("  ✅ 密码解密: 成功");
+                    System.out.println("  📏 明文长度: " + decryptedPassword.length() + " 字符");
+                    successCount++;
                 } catch (Exception e) {
-                    System.out.println("  ⚠ 密码解密失败: " + e.getMessage());
-                    // 记录警告但不失败，可能是测试环境的加密密钥不同
+                    System.out.println("  ❌ 密码解密: 失败");
+                    System.out.println("  📝 异常类型: " + e.getClass().getSimpleName());
+                    System.out.println("  📝 异常信息: " + e.getMessage());
+                    
+                    // 打印根本原因
+                    Throwable cause = e.getCause();
+                    if (cause != null) {
+                        System.out.println("  🔍 根本原因: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
+                    }
+                    
+                    failCount++;
                 }
             } else {
-                System.out.println("  ℹ 密码为明文状态 (长度: " + ds.getPassword().length() + " 字符)");
+                System.out.println("  ℹ️  密码为明文状态");
+                System.out.println("  📏 密码长度: " + ds.getPassword().length() + " 字符");
+                successCount++;
             }
         }
+        
+        System.out.println("----------------------------------------");
+        System.out.println("密码检查汇总:");
+        System.out.println("  总计: " + dataSources.size() + " 个数据源");
+        System.out.println("  ✅ 成功: " + successCount + " 个");
+        System.out.println("  ❌ 失败: " + failCount + " 个");
+        System.out.println("----------------------------------------");
     }
 
     @Test
