@@ -49,6 +49,7 @@ public class ExportController {
             @RequestParam String configName,
             @RequestParam String database,
             @RequestParam(defaultValue = "json") String format,
+            @RequestParam(required = false) String schema,
             @RequestParam(required = false) String tablePattern,
             @RequestParam(required = false) String excludeTables) {
         
@@ -64,6 +65,7 @@ public class ExportController {
         ExportOptions options = ExportOptions.builder()
                 .format(format)
                 .database(database)
+                .schema(schema)
                 .tablePattern(tablePattern)
                 .includeIndexes(true)
                 .includeForeignKeys(true)
@@ -127,6 +129,63 @@ public class ExportController {
         } catch (Exception e) {
             log.error("获取数据库列表失败", e);
             throw new RuntimeException("获取数据库列表失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/schemas")
+    @Operation(summary = "获取SCHEMA列表", description = "根据数据源配置获取SCHEMA列表")
+    public ResponseEntity<List<String>> getSchemas(
+            @RequestParam String configName,
+            @RequestParam String database) {
+        log.info("获取SCHEMA列表, 配置名: {}, 数据库: {}", configName, database);
+        
+        // 参数校验
+        if (configName == null || configName.trim().isEmpty()) {
+            throw new IllegalArgumentException("数据源配置名称不能为空");
+        }
+        if (database == null || database.trim().isEmpty()) {
+            throw new IllegalArgumentException("数据库名称不能为空");
+        }
+        
+        // 获取配置
+        DataSourceConfig config = configService.getConfigByName(configName);
+        if (config == null) {
+            throw new IllegalArgumentException("数据源配置不存在: " + configName);
+        }
+        
+        try {
+            // 解密密码
+            DataSourceConfig configCopy = cloneConfig(config);
+            configCopy.setDatabase(database); // 设置数据库
+            
+            if (configCopy.getPassword() != null && CryptoUtil.isEncrypted(configCopy.getPassword())) {
+                try {
+                    String decryptedPassword = CryptoUtil.decrypt(configCopy.getPassword());
+                    configCopy.setPassword(decryptedPassword);
+                } catch (Exception e) {
+                    log.error("密码解密失败", e);
+                }
+            }
+            
+            // 获取适配器并连接
+            DatabaseAdapter adapter = adapterFactory.getAdapter(configCopy.getType());
+            
+            // 检查是否支持SCHEMA
+            if (!adapter.supportsSchema()) {
+                throw new IllegalArgumentException("此数据库类型不支持SCHEMA层级");
+            }
+            
+            List<String> schemas;
+            try (Connection conn = adapter.connect(configCopy)) {
+                schemas = adapter.getSchemas(conn);
+            }
+            
+            log.info("获取到 {} 个SCHEMA", schemas.size());
+            return ResponseEntity.ok(schemas);
+            
+        } catch (Exception e) {
+            log.error("获取SCHEMA列表失败", e);
+            throw new RuntimeException("获取SCHEMA列表失败: " + e.getMessage());
         }
     }
     

@@ -42,3 +42,8 @@ export function testConnection(config) {
 export function getDatabases(configName) {
   return request.get('/export/databases', { params: { configName } })
 }
+
+// 获取SCHEMA列表(根据配置名称和数据库)
+export function getSchemas(configName, database) {
+  return request.get('/export/schemas', { params: { configName, database } })
+}

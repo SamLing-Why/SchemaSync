@@ -111,6 +111,11 @@ public class GaussDBAdapter implements DatabaseAdapter {
     }
 
     @Override
+    public boolean supportsSchema() {
+        return true; // GaussDB支持SCHEMA层级结构
+    }
+
+    @Override
     public List<String> getDatabases(Connection conn) throws SQLException {
         List<String> databases = new ArrayList<>();
         try (Statement stmt = conn.createStatement();
@@ -126,6 +131,26 @@ public class GaussDBAdapter implements DatabaseAdapter {
             }
         }
         return databases;
+    }
+
+    /**
+     * 获取SCHEMA列表(GaussDB特有)
+     * GaussDB层级: 数据库 → SCHEMA → 表
+     */
+    public List<String> getSchemas(Connection conn) throws SQLException {
+        List<String> schemas = new ArrayList<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 "SELECT nspname FROM pg_namespace " +
+                 "WHERE nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema') " +
+                 "AND nspname NOT LIKE 'pg_temp_%' " +
+                 "AND nspname NOT LIKE 'pg_toast_temp_%' " +
+                 "ORDER BY nspname")) {
+            while (rs.next()) {
+                schemas.add(rs.getString("nspname"));
+            }
+        }
+        return schemas;
     }
 
     @Override
@@ -162,12 +187,18 @@ public class GaussDBAdapter implements DatabaseAdapter {
         metadata.setExportTime(new Date());
         metadata.setDatabaseType("GaussDB");
         metadata.setDatabaseName(options.getDatabase());
+        metadata.setSchemaName(options.getSchema()); // 记录SCHEMA
         dictionary.setMetadata(metadata);
         
         try (Connection conn = connect(config)) {
-            // 自动检测schema，不局限于public
-            String schema = detectSchema(conn, options.getDatabase());
-            log.info("GaussDB检测到schema: {}", schema);
+            // 优先使用用户指定的schema，否则自动检测
+            String schema = options.getSchema();
+            if (schema == null || schema.trim().isEmpty()) {
+                schema = detectSchema(conn, options.getDatabase());
+                log.info("GaussDB未指定schema，自动检测到: {}", schema);
+            } else {
+                log.info("GaussDB使用用户指定的schema: {}", schema);
+            }
             
             List<TableDefinition> tables = getTables(conn, schema);
             log.info("GaussDB获取到{}张表", tables.size());

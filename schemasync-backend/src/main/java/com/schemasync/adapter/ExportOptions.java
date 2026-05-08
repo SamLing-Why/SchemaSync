@@ -21,6 +21,11 @@ public class ExportOptions {
     private String database;
     
     /**
+     * SCHEMA名称(仅PostgreSQL/GaussDB等支持SCHEMA的数据库使用)
+     */
+    private String schema;
+    
+    /**
      * 表名模式过滤(支持通配符)
      */
     private String tablePattern;
@@ -49,6 +54,8 @@ public class ExportOptions {
     public void setFormat(String format) { this.format = format; }
     public String getDatabase() { return database; }
     public void setDatabase(String database) { this.database = database; }
+    public String getSchema() { return schema; }
+    public void setSchema(String schema) { this.schema = schema; }
     public String getTablePattern() { return tablePattern; }
     public void setTablePattern(String tablePattern) { this.tablePattern = tablePattern; }
     public List<String> getExcludeTables() { return excludeTables; }
@@ -74,6 +81,11 @@ public class ExportOptions {
         
         public Builder database(String database) {
             instance.setDatabase(database);
+            return this;
+        }
+        
+        public Builder schema(String schema) {
+            instance.setSchema(schema);
             return this;
         }
         

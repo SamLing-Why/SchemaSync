@@ -43,6 +43,26 @@ public interface DatabaseAdapter {
     List<String> getDatabases(Connection conn) throws SQLException;
     
     /**
+     * 是否支持SCHEMA层级结构
+     * 
+     * @return true表示支持SCHEMA(如PostgreSQL/GaussDB), false表示不支持(如MySQL)
+     */
+    default boolean supportsSchema() {
+        return false;
+    }
+    
+    /**
+     * 获取SCHEMA列表(仅当supportsSchema()返回true时有效)
+     * 
+     * @param conn 数据库连接
+     * @return SCHEMA名称列表
+     * @throws SQLException SQL异常
+     */
+    default List<String> getSchemas(Connection conn) throws SQLException {
+        throw new UnsupportedOperationException("此数据库不支持SCHEMA层级");
+    }
+    
+    /**
      * 获取指定数据库的所有表
      * 
      * @param conn 数据库连接

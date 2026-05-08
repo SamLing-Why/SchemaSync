@@ -26,6 +26,7 @@
             allow-create
             default-first-option
             @focus="onDatabaseFocus"
+            @change="onDatabaseChange"
           >
             <el-option
               v-for="db in databaseList"
@@ -36,6 +37,25 @@
           </el-select>
           <div v-if="databaseList.length === 0 && !loadingDatabases" style="color: #909399; font-size: 12px; margin-top: 5px;">
             选择数据源后将自动加载数据库列表
+          </div>
+        </el-form-item>
+
+        <el-form-item v-if="showSchemaSelect" label="SCHEMA">
+          <el-select 
+            v-model="form.schema" 
+            placeholder="请选择SCHEMA" 
+            :loading="loadingSchemas"
+            filterable
+          >
+            <el-option
+              v-for="schema in schemaList"
+              :key="schema"
+              :label="schema"
+              :value="schema"
+            />
+          </el-select>
+          <div v-if="schemaList.length === 0 && !loadingSchemas" style="color: #909399; font-size: 12px; margin-top: 5px;">
+            选择数据库后将自动加载SCHEMA列表
           </div>
         </el-form-item>
 
@@ -58,21 +78,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import { getDataSources, getDatabases } from '../api/config'
+import { getDataSources, getDatabases, getSchemas } from '../api/config'
 
 const dataSources = ref([])
 const databaseList = ref([])
+const schemaList = ref([])
 const loadingDatabases = ref(false)
+const loadingSchemas = ref(false)
 const exporting = ref(false)
 const databasesLoaded = ref(false) // 标记是否已加载过数据库列表
+const currentDataSource = ref(null) // 当前选中的数据源
 
 const form = ref({
   configName: '',
   database: '',
+  schema: '',  // SCHEMA字段
   format: 'excel'  // 默认导出Excel
+})
+
+// 计算是否显示SCHEMA选择框
+const showSchemaSelect = computed(() => {
+  return currentDataSource.value && 
+         (currentDataSource.value.type === 'GAUSSDB' || 
+          currentDataSource.value.type === 'OPENGAUSS' ||
+          currentDataSource.value.type === 'POSTGRESQL')
 })
 
 onMounted(() => {
@@ -89,10 +121,15 @@ const loadDataSources = async () => {
 
 // 数据源改变时加载数据库列表
 const onDataSourceChange = async () => {
-  // 清空数据库选择和列表
+  // 清空数据库和SCHEMA选择
   form.value.database = ''
+  form.value.schema = ''
   databaseList.value = []
+  schemaList.value = []
   databasesLoaded.value = false
+  
+  // 记录当前数据源
+  currentDataSource.value = dataSources.value.find(ds => ds.name === form.value.configName)
   
   // 自动加载数据库列表
   await loadDatabases()
@@ -126,6 +163,39 @@ const onDatabaseFocus = () => {
   }
 }
 
+// 数据库改变时加载SCHEMA列表
+const onDatabaseChange = async () => {
+  // 清空SCHEMA选择
+  form.value.schema = ''
+  schemaList.value = []
+  
+  // 如果当前数据源支持SCHEMA，自动加载
+  if (showSchemaSelect.value && form.value.database) {
+    await loadSchemas()
+  }
+}
+
+// 加载SCHEMA列表
+const loadSchemas = async () => {
+  if (!form.value.configName || !form.value.database) {
+    return
+  }
+  
+  loadingSchemas.value = true
+  try {
+    const schemas = await getSchemas(form.value.configName, form.value.database)
+    schemaList.value = schemas
+    if (schemas.length > 0) {
+      ElMessage.success(`加载了 ${schemas.length} 个SCHEMA`)
+    }
+  } catch (error) {
+    ElMessage.warning('加载SCHEMA列表失败: ' + (error.message || '未知错误'))
+    schemaList.value = []
+  } finally {
+    loadingSchemas.value = false
+  }
+}
+
 const handleExport = async () => {
   if (!form.value.configName || !form.value.database) {
     ElMessage.warning('请填写完整信息')
@@ -140,6 +210,11 @@ const handleExport = async () => {
       database: form.value.database,
       format: form.value.format
     })
+    
+    // 如果有SCHEMA，添加到参数中
+    if (form.value.schema) {
+      params.append('schema', form.value.schema)
+    }
 
     const response = await fetch(`/api/export?${params}`, {
       method: 'POST'
