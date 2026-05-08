@@ -267,6 +267,8 @@
                         </exclude>
                     </excludes>
                     <executable>true</executable>
+                    <!-- 使用PropertiesLauncher支持-Dloader.path参数 -->
+                    <layout>ZIP</layout>
                 </configuration>
                 <executions>
                     <execution>
