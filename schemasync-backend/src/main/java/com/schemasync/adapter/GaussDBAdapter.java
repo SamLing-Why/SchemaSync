@@ -186,39 +186,58 @@ public class GaussDBAdapter implements DatabaseAdapter {
 
     @Override
     public SchemaDictionary exportSchema(DataSourceConfig config, ExportOptions options) throws SQLException {
+        long startTime = System.currentTimeMillis();
+        log.info("========== 开始导出GaussDB数据字典 ==========");
+        log.info("数据库: {}, SCHEMA: {}", options.getDatabase(), options.getSchema());
+        
         SchemaDictionary dictionary = new SchemaDictionary();
         
         ExportMetadata metadata = new ExportMetadata();
         metadata.setExportTime(new Date());
         metadata.setDatabaseType("GaussDB");
         metadata.setDatabaseName(options.getDatabase());
-        metadata.setSchemaName(options.getSchema()); // 记录SCHEMA
+        metadata.setSchemaName(options.getSchema());
         dictionary.setMetadata(metadata);
         
         try (Connection conn = connect(config)) {
-            // 优先使用用户指定的schema，否则自动检测
+            long connTime = System.currentTimeMillis();
+            log.info("[1/4] 数据库连接成功, 耗时: {}ms", connTime - startTime);
+            
             String schema = options.getSchema();
             if (schema == null || schema.trim().isEmpty()) {
                 schema = detectSchema(conn, options.getDatabase());
-                log.info("GaussDB未指定schema，自动检测到: {}", schema);
+                log.info("未指定SCHEMA，自动检测到: {}", schema);
             } else {
-                log.info("GaussDB使用用户指定的schema: {}", schema);
+                log.info("使用用户指定的SCHEMA: {}", schema);
             }
             
-            log.info("GaussDB开始查询表列表, schema: {}", schema);
+            log.info("[2/4] 开始查询表列表...");
+            long tableQueryStart = System.currentTimeMillis();
             List<TableDefinition> tables = getTables(conn, schema);
-            log.info("GaussDB获取到{}张表", tables.size());
+            long tableQueryTime = System.currentTimeMillis() - tableQueryStart;
+            log.info("获取到 {} 张表, 耗时: {}ms", tables.size(), tableQueryTime);
             
             if (options.getTablePattern() != null) {
+                int beforeFilter = tables.size();
                 String pattern = options.getTablePattern().replace("%", ".*");
                 tables.removeIf(t -> !t.getTableName().matches(pattern));
+                log.info("按模式过滤后: {} 张表 (原 {} 张)", tables.size(), beforeFilter);
             }
             
             if (options.getExcludeTables() != null && !options.getExcludeTables().isEmpty()) {
+                int beforeExclude = tables.size();
                 tables.removeIf(t -> options.getExcludeTables().contains(t.getTableName()));
+                log.info("排除指定表后: {} 张表 (原 {} 张)", tables.size(), beforeExclude);
             }
             
+            log.info("[3/4] 开始导出表详细信息...");
+            long detailStart = System.currentTimeMillis();
+            int exportedCount = 0;
+            
             for (TableDefinition table : tables) {
+                exportedCount++;
+                long tableStart = System.currentTimeMillis();
+                
                 table.setColumns(getColumns(conn, schema, table.getTableName()));
                 
                 if (options.getIncludeIndexes()) {
@@ -228,9 +247,28 @@ public class GaussDBAdapter implements DatabaseAdapter {
                 if (options.getIncludeForeignKeys()) {
                     table.setForeignKeys(getForeignKeys(conn, schema, table.getTableName()));
                 }
+                
+                long tableTime = System.currentTimeMillis() - tableStart;
+                
+                if (exportedCount % 10 == 0 || exportedCount == tables.size()) {
+                    log.info("进度: {}/{} 张表 ({}%), 当前表: {}, 耗时: {}ms", 
+                        exportedCount, tables.size(), 
+                        (exportedCount * 100 / tables.size()),
+                        table.getTableName(),
+                        tableTime);
+                }
             }
             
+            long detailTime = System.currentTimeMillis() - detailStart;
+            log.info("[3/4] 表详细信息导出完成, 共 {} 张表, 耗时: {}ms", tables.size(), detailTime);
+            
             dictionary.setTables(tables);
+            
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("[4/4] 数据字典组装完成");
+            log.info("========== GaussDB数据字典导出完成 ==========");
+            log.info("总计耗时: {}ms ({}秒), 导出表数: {}", 
+                totalTime, totalTime / 1000.0, tables.size());
         }
         
         return dictionary;

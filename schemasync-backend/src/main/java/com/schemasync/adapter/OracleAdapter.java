@@ -97,9 +97,12 @@ public class OracleAdapter implements DatabaseAdapter {
 
     @Override
     public SchemaDictionary exportSchema(DataSourceConfig config, ExportOptions options) throws SQLException {
+        long startTime = System.currentTimeMillis();
+        log.info("========== 开始导出Oracle数据字典 ==========");
+        log.info("数据库: {}, SCHEMA: {}", options.getDatabase(), config.getUsername());
+        
         SchemaDictionary dictionary = new SchemaDictionary();
         
-        // 设置元数据
         ExportMetadata metadata = new ExportMetadata();
         metadata.setExportTime(new Date());
         metadata.setDatabaseType("Oracle");
@@ -107,22 +110,36 @@ public class OracleAdapter implements DatabaseAdapter {
         dictionary.setMetadata(metadata);
         
         try (Connection conn = connect(config)) {
-            // 获取所有表(Oracle的schema就是用户名)
-            List<TableDefinition> tables = getTables(conn, config.getUsername());
+            long connTime = System.currentTimeMillis();
+            log.info("[1/4] 数据库连接成功, 耗时: {}ms", connTime - startTime);
             
-            // 过滤表(简单实现)
+            log.info("[2/4] 开始查询表列表...");
+            long tableQueryStart = System.currentTimeMillis();
+            List<TableDefinition> tables = getTables(conn, config.getUsername());
+            long tableQueryTime = System.currentTimeMillis() - tableQueryStart;
+            log.info("获取到 {} 张表, 耗时: {}ms", tables.size(), tableQueryTime);
+            
             if (options.getTablePattern() != null) {
+                int beforeFilter = tables.size();
                 String pattern = options.getTablePattern().replace("%", ".*");
                 tables.removeIf(t -> !t.getTableName().matches(pattern));
+                log.info("按模式过滤后: {} 张表 (原 {} 张)", tables.size(), beforeFilter);
             }
             
-            // 排除表
             if (options.getExcludeTables() != null && !options.getExcludeTables().isEmpty()) {
+                int beforeExclude = tables.size();
                 tables.removeIf(t -> options.getExcludeTables().contains(t.getTableName()));
+                log.info("排除指定表后: {} 张表 (原 {} 张)", tables.size(), beforeExclude);
             }
             
-            // 导出每个表的详细信息
+            log.info("[3/4] 开始导出表详细信息...");
+            long detailStart = System.currentTimeMillis();
+            int exportedCount = 0;
+            
             for (TableDefinition table : tables) {
+                exportedCount++;
+                long tableStart = System.currentTimeMillis();
+                
                 table.setColumns(getColumns(conn, config.getUsername(), table.getTableName()));
                 
                 if (options.getIncludeIndexes()) {
@@ -132,9 +149,28 @@ public class OracleAdapter implements DatabaseAdapter {
                 if (options.getIncludeForeignKeys()) {
                     table.setForeignKeys(getForeignKeys(conn, config.getUsername(), table.getTableName()));
                 }
+                
+                long tableTime = System.currentTimeMillis() - tableStart;
+                
+                if (exportedCount % 10 == 0 || exportedCount == tables.size()) {
+                    log.info("进度: {}/{} 张表 ({}%), 当前表: {}, 耗时: {}ms", 
+                        exportedCount, tables.size(), 
+                        (exportedCount * 100 / tables.size()),
+                        table.getTableName(),
+                        tableTime);
+                }
             }
             
+            long detailTime = System.currentTimeMillis() - detailStart;
+            log.info("[3/4] 表详细信息导出完成, 共 {} 张表, 耗时: {}ms", tables.size(), detailTime);
+            
             dictionary.setTables(tables);
+            
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("[4/4] 数据字典组装完成");
+            log.info("========== Oracle数据字典导出完成 ==========");
+            log.info("总计耗时: {}ms ({}秒), 导出表数: {}", 
+                totalTime, totalTime / 1000.0, tables.size());
         }
         
         return dictionary;

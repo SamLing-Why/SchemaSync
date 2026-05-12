@@ -223,11 +223,12 @@ public class MySQLAdapter implements DatabaseAdapter {
 
     @Override
     public SchemaDictionary exportSchema(DataSourceConfig config, ExportOptions options) throws SQLException {
-        log.info("开始导出数据字典: {} - {}", config.getName(), options.getDatabase());
+        long startTime = System.currentTimeMillis();
+        log.info("========== 开始导出MySQL数据字典 ==========");
+        log.info("数据库: {}", options.getDatabase());
         
         SchemaDictionary dictionary = new SchemaDictionary();
         
-        // 设置元数据
         ExportMetadata metadata = new ExportMetadata();
         metadata.setExportTime(new Date());
         metadata.setDatabaseType("MySQL");
@@ -235,41 +236,67 @@ public class MySQLAdapter implements DatabaseAdapter {
         metadata.setToolVersion("1.0.0");
         dictionary.setMetadata(metadata);
         
-        // 连接数据库并导出数据
         try (Connection conn = connect(config)) {
+            long connTime = System.currentTimeMillis();
+            log.info("[1/4] 数据库连接成功, 耗时: {}ms", connTime - startTime);
             metadata.setDatabaseVersion(getDatabaseVersion(conn));
             
-            // 获取所有表
+            log.info("[2/4] 开始查询表列表...");
+            long tableQueryStart = System.currentTimeMillis();
             List<TableDefinition> tables = getTables(conn, options.getDatabase());
+            long tableQueryTime = System.currentTimeMillis() - tableQueryStart;
+            log.info("获取到 {} 张表, 耗时: {}ms", tables.size(), tableQueryTime);
             
-            // 过滤表
             if (options.getTablePattern() != null && !options.getTablePattern().isEmpty()) {
+                int beforeFilter = tables.size();
                 tables = filterTablesByPattern(tables, options.getTablePattern());
+                log.info("按模式过滤后: {} 张表 (原 {} 张)", tables.size(), beforeFilter);
             }
             if (options.getExcludeTables() != null && !options.getExcludeTables().isEmpty()) {
+                int beforeExclude = tables.size();
                 tables = excludeTables(tables, options.getExcludeTables());
+                log.info("排除指定表后: {} 张表 (原 {} 张)", tables.size(), beforeExclude);
             }
             
-            // 导出每个表的详细信息
+            log.info("[3/4] 开始导出表详细信息...");
+            long detailStart = System.currentTimeMillis();
+            int exportedCount = 0;
+            
             for (TableDefinition table : tables) {
-                log.debug("导出表: {}", table.getTableName());
+                exportedCount++;
+                long tableStart = System.currentTimeMillis();
                 
-                // 字段
                 table.setColumns(getColumns(conn, options.getDatabase(), table.getTableName()));
                 
-                // 索引
                 if (options.getIncludeIndexes()) {
                     table.setIndexes(getIndexes(conn, options.getDatabase(), table.getTableName()));
                 }
                 
-                // 外键
                 if (options.getIncludeForeignKeys()) {
                     table.setForeignKeys(getForeignKeys(conn, options.getDatabase(), table.getTableName()));
                 }
+                
+                long tableTime = System.currentTimeMillis() - tableStart;
+                
+                if (exportedCount % 10 == 0 || exportedCount == tables.size()) {
+                    log.info("进度: {}/{} 张表 ({}%), 当前表: {}, 耗时: {}ms", 
+                        exportedCount, tables.size(), 
+                        (exportedCount * 100 / tables.size()),
+                        table.getTableName(),
+                        tableTime);
+                }
             }
             
+            long detailTime = System.currentTimeMillis() - detailStart;
+            log.info("[3/4] 表详细信息导出完成, 共 {} 张表, 耗时: {}ms", tables.size(), detailTime);
+            
             dictionary.setTables(tables);
-            log.info("数据字典导出完成, 共{}个表", tables.size());
+            
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("[4/4] 数据字典组装完成");
+            log.info("========== MySQL数据字典导出完成 ==========");
+            log.info("总计耗时: {}ms ({}秒), 导出表数: {}", 
+                totalTime, totalTime / 1000.0, tables.size());
         }
         
         return dictionary;
