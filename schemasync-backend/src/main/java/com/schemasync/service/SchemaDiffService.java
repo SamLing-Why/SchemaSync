@@ -461,9 +461,15 @@ public class SchemaDiffService {
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
             
-            // 创建表头
+            // 创建表头 - 增加12个新列
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"变更类型", "表名", "字段名", "严重程度", "详情"};
+            String[] headers = {
+                "变更类型", "表名", "字段名", "严重程度", "详情",
+                "数据类型(旧)", "数据类型(新)", "数据类型是否发生变化",
+                "长度(旧)", "长度(新)", "长度是否发生变化",
+                "精度(旧)", "精度(新)", "精度是否发生变化",
+                "字段注释(旧)", "字段注释(新)", "字段注释是否发生变化"
+            };
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -476,11 +482,37 @@ public class SchemaDiffService {
                     SchemaChange change = diff.getChanges().get(i);
                     Row row = sheet.createRow(i + 1);
                     
+                    // 基础列
                     row.createCell(0).setCellValue(getChangeTypeLabel(change.getChangeType()));
                     row.createCell(1).setCellValue(change.getTableName() != null ? change.getTableName() : "");
                     row.createCell(2).setCellValue(change.getColumnName() != null ? change.getColumnName() : "");
                     row.createCell(3).setCellValue(getSeverityLabel(change.getSeverity()));
                     row.createCell(4).setCellValue(formatChangeDetails(change.getDetails()));
+                    
+                    // 新增12个列
+                    // 数据类型
+                    row.createCell(5).setCellValue(change.getOldDataType() != null ? change.getOldDataType() : "");
+                    row.createCell(6).setCellValue(change.getNewDataType() != null ? change.getNewDataType() : "");
+                    row.createCell(7).setCellValue(change.getOldDataType() != null && change.getNewDataType() != null 
+                            && !change.getOldDataType().equals(change.getNewDataType()) ? "是" : "否");
+                    
+                    // 长度
+                    row.createCell(8).setCellValue(change.getOldLength() != null ? change.getOldLength().toString() : "");
+                    row.createCell(9).setCellValue(change.getNewLength() != null ? change.getNewLength().toString() : "");
+                    row.createCell(10).setCellValue(change.getOldLength() != null && change.getNewLength() != null 
+                            && !change.getOldLength().equals(change.getNewLength()) ? "是" : "否");
+                    
+                    // 精度
+                    row.createCell(11).setCellValue(change.getOldPrecision() != null ? change.getOldPrecision().toString() : "");
+                    row.createCell(12).setCellValue(change.getNewPrecision() != null ? change.getNewPrecision().toString() : "");
+                    row.createCell(13).setCellValue(change.getOldPrecision() != null && change.getNewPrecision() != null 
+                            && !change.getOldPrecision().equals(change.getNewPrecision()) ? "是" : "否");
+                    
+                    // 字段注释
+                    row.createCell(14).setCellValue(change.getOldComment() != null ? change.getOldComment() : "");
+                    row.createCell(15).setCellValue(change.getNewComment() != null ? change.getNewComment() : "");
+                    row.createCell(16).setCellValue(change.getOldComment() != null && change.getNewComment() != null 
+                            && !change.getOldComment().equals(change.getNewComment()) ? "是" : "否");
                 }
             }
             

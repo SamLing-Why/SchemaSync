@@ -6,24 +6,17 @@
       </template>
 
       <el-form label-width="120px">
-        <el-form-item label="文件格式">
-          <el-radio-group v-model="fileType">
-            <el-radio label="excel">Excel</el-radio>
-            <el-radio label="json">JSON</el-radio>
-          </el-radio-group>
-        </el-form-item>
-
         <el-form-item label="旧版本文件">
           <el-upload
             ref="oldUpload"
             :auto-upload="false"
             :limit="1"
-            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
+            accept=".xlsx,.xls"
             @change="handleOldFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择旧版本数据字典文件({{ fileType === 'excel' ? 'Excel' : 'JSON' }})</div>
+              <div class="el-upload__tip">请选择旧版本数据字典文件(Excel)</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -33,21 +26,14 @@
             ref="newUpload"
             :auto-upload="false"
             :limit="1"
-            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
+            accept=".xlsx,.xls"
             @change="handleNewFile"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">请选择新版本数据字典文件({{ fileType === 'excel' ? 'Excel' : 'JSON' }})</div>
+              <div class="el-upload__tip">请选择新版本数据字典文件(Excel)</div>
             </template>
           </el-upload>
-        </el-form-item>
-
-        <el-form-item label="导出格式">
-          <el-radio-group v-model="exportFormat">
-            <el-radio value="excel">Excel</el-radio>
-            <el-radio value="json">JSON</el-radio>
-          </el-radio-group>
         </el-form-item>
 
         <el-form-item>
@@ -106,24 +92,36 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Switch as Compare, Download } from '@element-plus/icons-vue'
 
-const fileType = ref('excel')
-const exportFormat = ref('excel')
 const oldFile = ref(null)
 const newFile = ref(null)
+const oldFileBuffer = ref(null)  // 保存文件内容
+const newFileBuffer = ref(null)  // 保存文件内容
 const comparing = ref(false)
 const generatingDdl = ref(false)
 const diffResult = ref(null)
 
-const handleOldFile = (file) => {
+const handleOldFile = async (file) => {
   oldFile.value = file.raw
+  // 保存文件内容
+  try {
+    oldFileBuffer.value = await file.raw.arrayBuffer()
+  } catch (e) {
+    console.error('读取旧文件失败:', e)
+  }
 }
 
-const handleNewFile = (file) => {
+const handleNewFile = async (file) => {
   newFile.value = file.raw
+  // 保存文件内容
+  try {
+    newFileBuffer.value = await file.raw.arrayBuffer()
+  } catch (e) {
+    console.error('读取新文件失败:', e)
+  }
 }
 
 const handleCompare = async () => {
-  if (!oldFile.value || !newFile.value) {
+  if (!oldFileBuffer.value || !newFileBuffer.value) {
     ElMessage.warning('请选择两个文件')
     return
   }
@@ -131,8 +129,8 @@ const handleCompare = async () => {
   comparing.value = true
   try {
     const formData = new FormData()
-    formData.append('oldFile', oldFile.value)
-    formData.append('newFile', newFile.value)
+    formData.append('oldFile', new Blob([oldFileBuffer.value]), oldFile.value.name)
+    formData.append('newFile', new Blob([newFileBuffer.value]), newFile.value.name)
 
     const response = await fetch('/api/diff/summary', {
       method: 'POST',
@@ -153,23 +151,48 @@ const handleCompare = async () => {
 }
 
 const downloadDiff = async () => {
+  if (!oldFileBuffer.value || !newFileBuffer.value) {
+    ElMessage.warning('请先选择文件并进行对比')
+    return
+  }
+
+  comparing.value = true
   try {
     const formData = new FormData()
-    formData.append('oldFile', oldFile.value)
-    formData.append('newFile', newFile.value)
-    formData.append('exportFormat', exportFormat.value)
+    formData.append('oldFile', new Blob([oldFileBuffer.value]), oldFile.value.name)
+    formData.append('newFile', new Blob([newFileBuffer.value]), newFile.value.name)
+    formData.append('exportFormat', 'excel')  // 固定为Excel
 
     const response = await fetch('/api/diff', {
       method: 'POST',
       body: formData
     })
 
+    if (!response.ok) {
+      throw new Error('下载失败')
+    }
+
     const blob = await response.blob()
+    
+    // 检查blob是否有效
+    if (!blob || blob.size === 0) {
+      throw new Error('下载的文件为空')
+    }
+    
+    // 从响应头获取文件名
+    let fileName = `diff_${Date.now()}.xlsx`
+    const contentDisposition = response.headers.get('Content-Disposition')
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''))
+      }
+    }
+    
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const extension = exportFormat.value === 'excel' ? 'xlsx' : 'json'
-    a.download = `diff_${Date.now()}.${extension}`
+    a.download = fileName
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
@@ -177,7 +200,10 @@ const downloadDiff = async () => {
 
     ElMessage.success('下载成功')
   } catch (error) {
-    ElMessage.error('下载失败')
+    console.error('下载差异报告失败:', error)
+    ElMessage.error('下载失败: ' + (error.message || '未知错误'))
+  } finally {
+    comparing.value = false
   }
 }
 

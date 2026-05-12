@@ -6,18 +6,11 @@
       </template>
 
       <el-form label-width="120px">
-        <el-form-item label="文件格式">
-          <el-radio-group v-model="fileType">
-            <el-radio value="excel">Excel</el-radio>
-            <el-radio value="json">JSON</el-radio>
-          </el-radio-group>
-        </el-form-item>
-
         <el-form-item label="数据字典文件">
           <el-upload
             :auto-upload="false"
             :limit="1"
-            :accept="fileType === 'excel' ? '.xlsx,.xls' : '.json'"
+            accept=".xlsx,.xls"
             @change="handleFile"
           >
             <el-button type="primary">选择文件</el-button>
@@ -67,7 +60,6 @@ import { Document, Download } from '@element-plus/icons-vue'
 const selectedFile = ref(null)
 const generating = ref(false)
 const ddlScript = ref('')
-const fileType = ref('excel')
 
 const form = ref({
   databaseType: 'mysql'
@@ -87,7 +79,7 @@ const handleGenerate = async () => {
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
-    formData.append('fileType', fileType.value)
+    formData.append('fileType', 'excel')  // 固定为Excel
     formData.append('databaseType', form.value.databaseType)
 
     const response = await fetch('/api/ddl/preview', {

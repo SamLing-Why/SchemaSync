@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 /**
  * 数据字典对比控制器
  * 
@@ -45,8 +48,13 @@ public class DiffController {
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();
+        
+        // 生成文件名: diff_yyyyMMddHHmmss_时间戳.扩展名
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+        String dateTime = sdf.format(new Date());
         String extension = "excel".equals(exportFormat) ? ".xlsx" : ".json";
-        String fileName = "diff_" + System.currentTimeMillis() + extension;
+        String fileName = "diff_" + dateTime + "_" + System.currentTimeMillis() + extension;
+        
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
         headers.setContentLength(data.length);
@@ -84,7 +92,12 @@ public class DiffController {
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();
-        String fileName = "ddl_" + System.currentTimeMillis() + ".sql";
+        
+        // 生成文件名: ddl_yyyyMMddHHmmss_时间戳.sql
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+        String dateTime = sdf.format(new Date());
+        String fileName = "ddl_" + dateTime + "_" + System.currentTimeMillis() + ".sql";
+        
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
         headers.setContentLength(data.length);

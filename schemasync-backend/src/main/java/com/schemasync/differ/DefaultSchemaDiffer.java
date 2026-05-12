@@ -163,11 +163,16 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
         // 新增字段
         for (String columnName : newColumnMap.keySet()) {
             if (!oldColumnMap.containsKey(columnName)) {
+                ColumnDefinition newCol = newColumnMap.get(columnName);
                 changes.add(SchemaChange.builder()
                         .changeType(ChangeType.COLUMN_ADD)
                         .tableName(tableName)
                         .columnName(columnName)
                         .severity(Severity.NON_BREAKING)
+                        .newDataType(newCol.getDataType())
+                        .newLength(newCol.getLength())
+                        .newPrecision(newCol.getPrecision())
+                        .newComment(newCol.getComment())
                         .build());
                 log.debug("表{} 新增字段: {}", tableName, columnName);
             }
@@ -176,13 +181,18 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
         // 删除字段
         for (String columnName : oldColumnMap.keySet()) {
             if (!newColumnMap.containsKey(columnName)) {
+                ColumnDefinition oldCol = oldColumnMap.get(columnName);
                 changes.add(SchemaChange.builder()
                         .changeType(ChangeType.COLUMN_DROP)
                         .tableName(tableName)
                         .columnName(columnName)
                         .severity(Severity.BREAKING)
+                        .oldDataType(oldCol.getDataType())
+                        .oldLength(oldCol.getLength())
+                        .oldPrecision(oldCol.getPrecision())
+                        .oldComment(oldCol.getComment())
                         .details(createMap(
-                                "oldDefinition", oldColumnMap.get(columnName)
+                                "oldDefinition", oldCol
                         ))
                         .build());
                 log.debug("表{} 删除字段: {}", tableName, columnName);
@@ -204,122 +214,103 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
     }
 
     /**
-     * 对比单个字段的属性变更
+     * 对比单个字段的属性变更 - 合并为一条记录
      */
     private void compareColumnDetail(ColumnDefinition oldCol,
                                      ColumnDefinition newCol,
                                      List<SchemaChange> changes,
                                      String tableName,
                                      String columnName) {
+        // 收集所有变化
+        List<String> changeDetails = new ArrayList<>();
+        Severity maxSeverity = Severity.NON_BREAKING;
+        boolean hasChange = false;
+        
         // 对比数据类型
         if (!Objects.equals(oldCol.getDataType(), newCol.getDataType())) {
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(Severity.BREAKING)
-                    .details(createMap(
-                            "property", "dataType",
-                            "oldValue", oldCol.getDataType(),
-                            "newValue", newCol.getDataType(),
-                            "impact", "数据类型变更,可能导致数据转换失败"
-                    ))
-                    .build());
+            String detail = String.format("数据类型: %s -> %s", 
+                    oldCol.getDataType(), newCol.getDataType());
+            changeDetails.add(detail);
+            maxSeverity = Severity.BREAKING;
+            hasChange = true;
         }
 
         // 对比长度
         if (!Objects.equals(oldCol.getLength(), newCol.getLength())) {
-            Severity severity = isLengthDecreased(oldCol.getLength(), newCol.getLength())
-                    ? Severity.BREAKING : Severity.NON_BREAKING;
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(severity)
-                    .details(createMap(
-                            "property", "length",
-                            "oldValue", oldCol.getLength(),
-                            "newValue", newCol.getLength(),
-                            "impact", severity == Severity.BREAKING ? "长度缩小,可能导致数据截断" : "长度扩展"
-                    ))
-                    .build());
+            boolean isDecreased = isLengthDecreased(oldCol.getLength(), newCol.getLength());
+            if (isDecreased) {
+                maxSeverity = Severity.BREAKING;
+            }
+            String detail = String.format("长度: %s -> %s", 
+                    oldCol.getLength(), newCol.getLength());
+            changeDetails.add(detail);
+            hasChange = true;
         }
 
         // 对比精度
         if (!Objects.equals(oldCol.getPrecision(), newCol.getPrecision())) {
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(Severity.BREAKING)
-                    .details(createMap(
-                            "property", "precision",
-                            "oldValue", oldCol.getPrecision(),
-                            "newValue", newCol.getPrecision()
-                    ))
-                    .build());
+            String detail = String.format("精度: %s -> %s", 
+                    oldCol.getPrecision(), newCol.getPrecision());
+            changeDetails.add(detail);
+            maxSeverity = Severity.BREAKING;
+            hasChange = true;
         }
 
         // 对比小数位
         if (!Objects.equals(oldCol.getScale(), newCol.getScale())) {
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(Severity.BREAKING)
-                    .details(createMap(
-                            "property", "scale",
-                            "oldValue", oldCol.getScale(),
-                            "newValue", newCol.getScale()
-                    ))
-                    .build());
+            String detail = String.format("小数位: %s -> %s", 
+                    oldCol.getScale(), newCol.getScale());
+            changeDetails.add(detail);
+            maxSeverity = Severity.BREAKING;
+            hasChange = true;
         }
 
         // 对比NULL约束
         if (!Objects.equals(oldCol.getNullable(), newCol.getNullable())) {
-            Severity severity = Boolean.FALSE.equals(newCol.getNullable())
-                    ? Severity.BREAKING : Severity.NON_BREAKING;
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(severity)
-                    .details(createMap(
-                            "property", "nullable",
-                            "oldValue", oldCol.getNullable(),
-                            "newValue", newCol.getNullable(),
-                            "impact", severity == Severity.BREAKING ? "添加NOT NULL约束,需要处理现有NULL值" : "移除NOT NULL约束"
-                    ))
-                    .build());
+            boolean isAddingNotNull = Boolean.FALSE.equals(newCol.getNullable());
+            if (isAddingNotNull) {
+                maxSeverity = Severity.BREAKING;
+            }
+            String detail = String.format("NULL约束: %s -> %s", 
+                    oldCol.getNullable(), newCol.getNullable());
+            changeDetails.add(detail);
+            hasChange = true;
         }
 
         // 对比默认值
         if (!Objects.equals(oldCol.getDefaultValue(), newCol.getDefaultValue())) {
-            changes.add(SchemaChange.builder()
-                    .changeType(ChangeType.COLUMN_MODIFY)
-                    .tableName(tableName)
-                    .columnName(columnName)
-                    .severity(Severity.NON_BREAKING)
-                    .details(createMap(
-                            "property", "defaultValue",
-                            "oldValue", oldCol.getDefaultValue(),
-                            "newValue", newCol.getDefaultValue()
-                    ))
-                    .build());
+            String detail = String.format("默认值: %s -> %s", 
+                    oldCol.getDefaultValue(), newCol.getDefaultValue());
+            changeDetails.add(detail);
+            hasChange = true;
         }
 
         // 对比注释
         if (!Objects.equals(oldCol.getComment(), newCol.getComment())) {
+            String detail = String.format("注释: %s -> %s", 
+                    oldCol.getComment(), newCol.getComment());
+            changeDetails.add(detail);
+            hasChange = true;
+        }
+        
+        // 如果有变化，生成一条合并的记录
+        if (hasChange) {
+            String details = String.join("; ", changeDetails);
+            
             changes.add(SchemaChange.builder()
                     .changeType(ChangeType.COLUMN_MODIFY)
                     .tableName(tableName)
                     .columnName(columnName)
-                    .severity(Severity.NON_BREAKING)
-                    .details(createMap(
-                            "property", "comment",
-                            "oldValue", oldCol.getComment(),
-                            "newValue", newCol.getComment()
-                    ))
+                    .severity(maxSeverity)
+                    .oldDataType(oldCol.getDataType())
+                    .newDataType(newCol.getDataType())
+                    .oldLength(oldCol.getLength())
+                    .newLength(newCol.getLength())
+                    .oldPrecision(oldCol.getPrecision())
+                    .newPrecision(newCol.getPrecision())
+                    .oldComment(oldCol.getComment())
+                    .newComment(newCol.getComment())
+                    .details(details)
                     .build());
         }
     }

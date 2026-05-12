@@ -12,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * DDL生成控制器
@@ -39,7 +41,12 @@ public class DdlController {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            String downloadName = "ddl_" + System.currentTimeMillis() + ".sql";
+            
+            // 生成文件名: ddl_yyyyMMddHHmmss_时间戳.sql
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+            String dateTime = sdf.format(new Date());
+            String downloadName = "ddl_" + dateTime + "_" + System.currentTimeMillis() + ".sql";
+            
             headers.setContentDispositionFormData("attachment", downloadName);
             headers.setContentLength(ddlBytes.length);
             
@@ -76,7 +83,12 @@ public class DdlController {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            String downloadName = "ddl_" + System.currentTimeMillis() + ".sql";
+            
+            // 生成文件名: ddl_yyyyMMddHHmmss_时间戳.sql
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+            String dateTime = sdf.format(new Date());
+            String downloadName = "ddl_" + dateTime + "_" + System.currentTimeMillis() + ".sql";
+            
             headers.setContentDispositionFormData("attachment", downloadName);
             headers.setContentLength(ddlBytes.length);
             

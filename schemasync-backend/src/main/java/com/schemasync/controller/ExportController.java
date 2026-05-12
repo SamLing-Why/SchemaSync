@@ -50,7 +50,6 @@ public class ExportController {
     public ResponseEntity<byte[]> exportSchema(
             @RequestParam String configName,
             @RequestParam String database,
-            @RequestParam(defaultValue = "json") String format,
             @RequestParam(required = false) String schema,
             @RequestParam(required = false) String tablePattern,
             @RequestParam(required = false) String excludeTables) {
@@ -62,6 +61,8 @@ public class ExportController {
         if (database == null || database.trim().isEmpty()) {
             throw new IllegalArgumentException("数据库名称不能为空");
         }
+        
+        String format = "excel";  // 固定为Excel
         
         // 构建导出选项
         ExportOptions options = ExportOptions.builder()

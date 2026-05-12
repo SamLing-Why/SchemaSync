@@ -59,13 +59,6 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="导出格式">
-          <el-radio-group v-model="form.format">
-            <el-radio value="excel">Excel</el-radio>
-            <el-radio value="json">JSON</el-radio>
-          </el-radio-group>
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" @click="handleExport" :loading="exporting">
             <el-icon><Download /></el-icon>
@@ -96,7 +89,7 @@ const form = ref({
   configName: '',
   database: '',
   schema: '',  // SCHEMA字段
-  format: 'excel'  // 默认导出Excel
+  format: 'excel'  // 固定为Excel
 })
 
 // 计算是否显示SCHEMA选择框
