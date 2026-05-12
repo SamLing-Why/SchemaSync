@@ -6,6 +6,7 @@ server:
 spring:
   application:
     name: schemasync-backend
+    version: @project.version@
 
   # Jackson配置
   jackson:
