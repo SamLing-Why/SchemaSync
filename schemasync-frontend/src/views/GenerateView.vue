@@ -8,8 +8,8 @@
       <el-form label-width="120px">
         <el-form-item label="文件格式">
           <el-radio-group v-model="fileType">
-            <el-radio label="excel">Excel</el-radio>
-            <el-radio label="json">JSON</el-radio>
+            <el-radio value="excel">Excel</el-radio>
+            <el-radio value="json">JSON</el-radio>
           </el-radio-group>
         </el-form-item>
 

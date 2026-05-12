@@ -158,8 +158,33 @@ public class ExcelFormatter {
                 setCell(dataRow, 0, column.getTableName(), dataStyle);
                 setCell(dataRow, 1, column.getColumnName(), dataStyle);
                 setCell(dataRow, 2, column.getDataType(), dataStyle);
-                setCell(dataRow, 3, column.getLength() != null ? column.getLength().toString() : "", dataStyle);
-                setCell(dataRow, 4, column.getPrecision() != null ? column.getPrecision().toString() : "", dataStyle);
+                
+                // 对于numeric类型：长度=总位数(precision)，精度=小数位(scale)
+                // 对于varchar等类型：长度=字符长度
+                String lengthStr = "";
+                String precisionStr = "";
+                
+                if ("numeric".equalsIgnoreCase(column.getDataType()) || 
+                    "decimal".equalsIgnoreCase(column.getDataType())) {
+                    // numeric/decimal类型：precision是总位数，scale是小数位
+                    if (column.getPrecision() != null) {
+                        lengthStr = column.getPrecision().toString();
+                    }
+                    if (column.getScale() != null) {
+                        precisionStr = column.getScale().toString();
+                    }
+                } else {
+                    // 其他类型：length是字符长度
+                    if (column.getLength() != null) {
+                        lengthStr = column.getLength().toString();
+                    }
+                    if (column.getPrecision() != null) {
+                        precisionStr = column.getPrecision().toString();
+                    }
+                }
+                
+                setCell(dataRow, 3, lengthStr, dataStyle);
+                setCell(dataRow, 4, precisionStr, dataStyle);
                 setCell(dataRow, 5, column.getNullable() != null && column.getNullable() ? "是" : "否", dataStyle);
                 setCell(dataRow, 6, column.getDefaultValue() != null ? column.getDefaultValue().toString() : "", dataStyle);
                 setCell(dataRow, 7, column.getIsPrimaryKey() != null && column.getIsPrimaryKey() ? "是" : "否", dataStyle);

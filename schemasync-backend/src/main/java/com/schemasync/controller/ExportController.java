@@ -18,7 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Connection;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -76,8 +78,16 @@ public class ExportController {
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();
-        String fileName = database + "_schema_" + System.currentTimeMillis() + 
+        
+        // 生成文件名: 数据库名_schema_yyyyMMddHHmmss_时间戳.扩展名
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+        String dateTime = sdf.format(new Date());
+        String fileName = database + "_schema_" + dateTime + "_" + System.currentTimeMillis() + 
                          ("json".equals(format) ? ".json" : ".xlsx");
+        
+        log.info("导出文件名生成: database={}, format={}, dateTime={}, fileName={}", 
+                database, format, dateTime, fileName);
+        
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
         headers.setContentLength(data.length);

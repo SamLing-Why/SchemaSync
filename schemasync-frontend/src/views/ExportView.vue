@@ -61,8 +61,8 @@
 
         <el-form-item label="导出格式">
           <el-radio-group v-model="form.format">
-            <el-radio label="excel">Excel</el-radio>
-            <el-radio label="json">JSON</el-radio>
+            <el-radio value="excel">Excel</el-radio>
+            <el-radio value="json">JSON</el-radio>
           </el-radio-group>
         </el-form-item>
 
@@ -248,11 +248,21 @@ const handleExport = async () => {
       }
     }
     
+    // 从响应头中获取文件名
+    const extension = form.value.format === 'excel' ? 'xlsx' : 'json'
+    let fileName = `${form.value.database}_schema_${Date.now()}.${extension}`
+    const contentDisposition = response.headers.get('Content-Disposition')
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''))
+      }
+    }
+    
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const extension = form.value.format === 'excel' ? 'xlsx' : 'json'
-    a.download = `${form.value.database}_schema_${Date.now()}.${extension}`
+    a.download = fileName
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)

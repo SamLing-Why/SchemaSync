@@ -34,6 +34,11 @@ public class ColumnInfoRow {
     private Long precision;
     
     /**
+     * 小数位(numeric/decimal字段的小数位数) - 使用Long支持超大值
+     */
+    private Long scale;
+    
+    /**
      * 是否允许NULL
      */
     private Boolean nullable;
@@ -73,6 +78,8 @@ public class ColumnInfoRow {
     public void setLength(Long length) { this.length = length; }
     public Long getPrecision() { return precision; }
     public void setPrecision(Long precision) { this.precision = precision; }
+    public Long getScale() { return scale; }
+    public void setScale(Long scale) { this.scale = scale; }
     public Boolean getNullable() { return nullable; }
     public void setNullable(Boolean nullable) { this.nullable = nullable; }
     public Object getDefaultValue() { return defaultValue; }

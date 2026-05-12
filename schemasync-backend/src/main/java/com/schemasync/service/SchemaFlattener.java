@@ -118,6 +118,7 @@ public class SchemaFlattener {
                 row.setDataType(column.getDataType());
                 row.setLength(column.getLength());
                 row.setPrecision(column.getPrecision());
+                row.setScale(column.getScale());
                 row.setNullable(column.getNullable());
                 row.setDefaultValue(column.getDefaultValue());
                 row.setIsPrimaryKey(column.getIsPrimaryKey());

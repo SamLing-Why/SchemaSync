@@ -38,26 +38,15 @@ public class GaussDBAdapter implements DatabaseAdapter {
         "  AND t.table_type IN ('BASE TABLE', 'VIEW') " +
         "ORDER BY t.table_name";
 
-    private static final String QUERY_COLUMNS = 
+    private static final String QUERY_COLUMNS =
         "SELECT " +
         "    a.attname AS COLUMN_NAME, " +
-        "    pg_catalog.format_type(a.atttypid, a.atttypmod) AS DATA_TYPE, " +
-        "    CASE " +
-        "        WHEN t.typname IN ('varchar', 'char', 'bpchar') THEN information_schema._pg_char_max_length(a.atttypid, a.atttypmod) " +
-        "        ELSE NULL " +
-        "    END AS CHARACTER_MAXIMUM_LENGTH, " +
-        "    CASE " +
-        "        WHEN t.typname IN ('numeric', 'decimal') THEN information_schema._pg_numeric_precision(a.atttypid, a.atttypmod) " +
-        "        ELSE NULL " +
-        "    END AS NUMERIC_PRECISION, " +
-        "    CASE " +
-        "        WHEN t.typname IN ('numeric', 'decimal') THEN information_schema._pg_numeric_scale(a.atttypid, a.atttypmod) " +
-        "        ELSE NULL " +
-        "    END AS NUMERIC_SCALE, " +
+        "    t.typname AS TYPE_NAME, " +
+        "    pg_catalog.format_type(a.atttypid, a.atttypmod) AS FORMAT_TYPE, " +
+        "    a.atttypmod AS ATT_TYPE_MOD, " +
         "    CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS IS_NULLABLE, " +
         "    pg_get_expr(ad.adbin, ad.adrelid) AS COLUMN_DEFAULT, " +
         "    CASE WHEN pk.contype = 'p' THEN 'PRI' ELSE '' END AS COLUMN_KEY, " +
-        "    CASE WHEN a.atthasdef THEN 'default' ELSE '' END AS EXTRA, " +
         "    col_description(a.attrelid, a.attnum) AS COLUMN_COMMENT, " +
         "    a.attnum AS ORDINAL_POSITION " +
         "FROM pg_attribute a " +
@@ -343,28 +332,17 @@ public class GaussDBAdapter implements DatabaseAdapter {
                     ColumnDefinition column = new ColumnDefinition();
                     column.setColumnName(rs.getString("COLUMN_NAME"));
                     
-                    // 解析数据类型(去掉长度信息)
-                    String fullType = rs.getString("DATA_TYPE");
-                    String dataType = fullType.split("\\(")[0];
+                    // 获取数据类型名称
+                    String typeName = rs.getString("TYPE_NAME");
+                    String dataType = convertToStandardTypeName(typeName);
                     column.setDataType(dataType);
                     
-                    // 长度 - 使用Long支持超大值
-                    long length = rs.getLong("CHARACTER_MAXIMUM_LENGTH");
-                    if (!rs.wasNull()) {
-                        column.setLength(length);
-                    }
+                    // 获取format_type的完整格式，如 "varchar(64)" 或 "numeric(25,2)"
+                    String formatType = rs.getString("FORMAT_TYPE");
+                    int attTypMod = rs.getInt("ATT_TYPE_MOD");
                     
-                    // 精度
-                    long precision = rs.getLong("NUMERIC_PRECISION");
-                    if (!rs.wasNull()) {
-                        column.setPrecision(precision);
-                    }
-                    
-                    // 小数位
-                    long scale = rs.getLong("NUMERIC_SCALE");
-                    if (!rs.wasNull()) {
-                        column.setScale(scale);
-                    }
+                    // 解析长度和精度
+                    parseTypeLengthAndPrecision(dataType, formatType, attTypMod, column);
                     
                     column.setNullable("YES".equals(rs.getString("IS_NULLABLE")));
                     
@@ -376,9 +354,6 @@ public class GaussDBAdapter implements DatabaseAdapter {
                     String columnKey = rs.getString("COLUMN_KEY");
                     column.setIsPrimaryKey("PRI".equals(columnKey));
                     
-                    String extra = rs.getString("EXTRA");
-                    column.setIsAutoIncrement(extra != null && extra.contains("default"));
-                    
                     column.setComment(rs.getString("COLUMN_COMMENT"));
                     column.setOrdinalPosition(rs.getInt("ORDINAL_POSITION"));
                     
@@ -388,6 +363,124 @@ public class GaussDBAdapter implements DatabaseAdapter {
         }
         
         return columns;
+    }
+    
+    /**
+     * 解析类型的长度和精度
+     * 兼容OpenGauss和GaussDB的差异
+     */
+    private void parseTypeLengthAndPrecision(String dataType, String formatType, int attTypMod, ColumnDefinition column) {
+        if (formatType == null || formatType.isEmpty()) {
+            return;
+        }
+        
+        // 从formatType中解析括号内的值
+        // 例如: varchar(64) -> 64, numeric(25,2) -> 25,2
+        int openParen = formatType.indexOf('(');
+        int closeParen = formatType.indexOf(')');
+        
+        if (openParen > 0 && closeParen > openParen) {
+            String params = formatType.substring(openParen + 1, closeParen);
+            String[] parts = params.split(",");
+            
+            if ("numeric".equalsIgnoreCase(dataType) || "decimal".equalsIgnoreCase(dataType) || "number".equalsIgnoreCase(dataType)) {
+                // numeric(precision, scale) 或 numeric(precision)
+                if (parts.length >= 1) {
+                    try {
+                        long precision = Long.parseLong(parts[0].trim());
+                        column.setPrecision(precision);
+                    } catch (NumberFormatException e) {
+                        log.warn("解析numeric精度失败: {}", parts[0]);
+                    }
+                }
+                if (parts.length >= 2) {
+                    try {
+                        long scale = Long.parseLong(parts[1].trim());
+                        column.setScale(scale);
+                    } catch (NumberFormatException e) {
+                        log.warn("解析numeric小数位失败: {}", parts[1]);
+                    }
+                }
+            } else if ("varchar".equalsIgnoreCase(dataType) || "char".equalsIgnoreCase(dataType) || 
+                       "nvarchar".equalsIgnoreCase(dataType) || "bpchar".equalsIgnoreCase(dataType)) {
+                // varchar(length) 或 char(length)
+                if (parts.length >= 1) {
+                    try {
+                        long length = Long.parseLong(parts[0].trim());
+                        column.setLength(length);
+                    } catch (NumberFormatException e) {
+                        log.warn("解析字符类型长度失败: {}", parts[0]);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * 将PostgreSQL内部类型名转换为标准DDL类型名
+     */
+    private String convertToStandardTypeName(String typeName) {
+        if (typeName == null) {
+            return "unknown";
+        }
+        
+        switch (typeName.toLowerCase()) {
+            case "varchar":
+            case "character varying":
+                return "varchar";
+            case "char":
+            case "character":
+                return "char";
+            case "bpchar":
+                return "char";
+            case "nvarchar":
+                return "nvarchar";
+            case "int2":
+                return "smallint";
+            case "int4":
+                return "integer";
+            case "int8":
+                return "bigint";
+            case "float4":
+                return "real";
+            case "float8":
+                return "double precision";
+            case "bool":
+                return "boolean";
+            case "timestamp":
+                return "timestamp";
+            case "timestamptz":
+                return "timestamp with time zone";
+            case "timetz":
+                return "time with time zone";
+            case "interval":
+                return "interval";
+            case "numeric":
+            case "decimal":
+                return "numeric";
+            case "number":
+                return "number";
+            case "text":
+                return "text";
+            case "bytea":
+                return "bytea";
+            case "json":
+                return "json";
+            case "jsonb":
+                return "jsonb";
+            case "uuid":
+                return "uuid";
+            case "xml":
+                return "xml";
+            case "inet":
+                return "inet";
+            case "macaddr":
+                return "macaddr";
+            case "cidr":
+                return "cidr";
+            default:
+                return typeName.toLowerCase();
+        }
     }
 
     @Override
