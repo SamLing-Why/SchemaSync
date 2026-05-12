@@ -36,15 +36,6 @@
         <hikaricp.version>4.0.3</hikaricp.version>
     </properties>
 
-    <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-        </resources>
-    </build>
-
     <dependencies>
         <!-- Spring Boot Web -->
         <dependency>
@@ -193,6 +184,12 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <!-- Frontend Maven Plugin - 构建前端 -->
             <plugin>
@@ -315,13 +312,6 @@
                 </configuration>
             </plugin>
         </plugins>
-
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-        </resources>
     </build>
 
     <profiles>
