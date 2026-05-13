@@ -53,10 +53,39 @@ echo [成功] 部署目录就绪
 REM 复制文件
 echo.
 echo [5/6] 复制部署文件...
-copy /Y schemasync-backend\target\schemasync-backend-1.0.0-SNAPSHOT.jar deploy\schemasync.jar >nul
-if exist schemasync-backend\src\main\resources\application.yml (
-    copy /Y schemasync-backend\src\main\resources\application.yml deploy\application.yml >nul
+
+REM 查找并复制最新打包的JAR
+for %%f in (schemasync-backend\target\schemasync-backend-*.jar) do (
+    echo [信息] 找到JAR文件: %%~nxf
+    echo [信息] 文件大小: %%~zf 字节
+    copy /Y "%%f" deploy\schemasync.jar >nul
+    if %errorlevel% neq 0 (
+        echo [错误] 复制JAR文件失败
+        pause
+        exit /b 1
+    )
+    echo [成功] 已复制: %%~nxf
+    goto :JAR_COPIED
 )
+
+echo [错误] 找不到JAR文件
+echo [提示] 请确认打包是否成功
+pause
+exit /b 1
+
+:JAR_COPIED
+
+REM 生成外置配置文件（从JAR包中提取已处理的配置）
+echo [信息] 生成外置配置文件...
+if exist schemasync-backend\target\schemasync-backend-*.jar (
+    REM 从JAR包中提取application.yml（Maven已替换占位符）
+    for %%f in (schemasync-backend\target\schemasync-backend-*.jar) do (
+        powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; $jar = '%%f'; $entryName = 'BOOT-INF/classes/application.yml'; $zip = [System.IO.Compression.ZipFile]::OpenRead($jar); $entry = $zip.Entries | Where-Object { $_.FullName -eq $entryName }; if ($entry) { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, 'deploy\application.yml', $true); Write-Host '[成功] 配置文件已从JAR包提取' } else { Write-Host '[警告] 未在JAR中找到配置文件' }; $zip.Dispose()"
+    )
+) else (
+    echo [警告] 未找到JAR文件
+)
+
 echo [成功] 文件复制完成
 
 REM 创建启动脚本

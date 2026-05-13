@@ -142,7 +142,7 @@ export default {
     noScript: '请先生成脚本'
   },
   footer: {
-    copyright: 'SchemaSync v1.0.0 © 2026',
+    copyright: 'SchemaSync v1.0.1 © 2026',
     poweredBy: '基于 Spring Boot + Vue 3'
   }
 }

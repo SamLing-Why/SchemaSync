@@ -1,6 +1,6 @@
 {
   "name": "schemasync-frontend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "SchemaSync - 轻量级数据字典管理工具前端",
   "scripts": {

@@ -366,29 +366,34 @@ public class GaussDBAdapter implements DatabaseAdapter {
     }
     
     /**
-     * 解析类型的长度和精度
+     * 解析类型长度和精度
      * 兼容OpenGauss和GaussDB的差异
      */
     private void parseTypeLengthAndPrecision(String dataType, String formatType, int attTypMod, ColumnDefinition column) {
         if (formatType == null || formatType.isEmpty()) {
             return;
         }
-        
+            
         // 从formatType中解析括号内的值
         // 例如: varchar(64) -> 64, numeric(25,2) -> 25,2
         int openParen = formatType.indexOf('(');
         int closeParen = formatType.indexOf(')');
-        
+            
         if (openParen > 0 && closeParen > openParen) {
             String params = formatType.substring(openParen + 1, closeParen);
             String[] parts = params.split(",");
-            
+                
             if ("numeric".equalsIgnoreCase(dataType) || "decimal".equalsIgnoreCase(dataType) || "number".equalsIgnoreCase(dataType)) {
                 // numeric(precision, scale) 或 numeric(precision)
                 if (parts.length >= 1) {
                     try {
                         long precision = Long.parseLong(parts[0].trim());
-                        column.setPrecision(precision);
+                        // GaussDB商业版可能有异常大的精度值，需要限制
+                        if (precision > 0 && precision < 10000) {
+                            column.setPrecision(precision);
+                        } else {
+                            log.debug("numeric精度值异常，已忽略: {} (格式: {})", precision, formatType);
+                        }
                     } catch (NumberFormatException e) {
                         log.warn("解析numeric精度失败: {}", parts[0]);
                     }
@@ -396,18 +401,25 @@ public class GaussDBAdapter implements DatabaseAdapter {
                 if (parts.length >= 2) {
                     try {
                         long scale = Long.parseLong(parts[1].trim());
-                        column.setScale(scale);
+                        if (scale >= 0 && scale < 10000) {
+                            column.setScale(scale);
+                        }
                     } catch (NumberFormatException e) {
                         log.warn("解析numeric小数位失败: {}", parts[1]);
                     }
                 }
             } else if ("varchar".equalsIgnoreCase(dataType) || "char".equalsIgnoreCase(dataType) || 
-                       "nvarchar".equalsIgnoreCase(dataType) || "bpchar".equalsIgnoreCase(dataType)) {
-                // varchar(length) 或 char(length)
+                       "nvarchar".equalsIgnoreCase(dataType) || "nvarchar2".equalsIgnoreCase(dataType) ||
+                       "bpchar".equalsIgnoreCase(dataType)) {
+                // varchar(length) 或 char(length) 或 nvarchar2(length)
                 if (parts.length >= 1) {
                     try {
                         long length = Long.parseLong(parts[0].trim());
-                        column.setLength(length);
+                        if (length > 0 && length < 1000000) {
+                            column.setLength(length);
+                        } else {
+                            log.debug("字符类型长度异常，已忽略: {} (格式: {})", length, formatType);
+                        }
                     } catch (NumberFormatException e) {
                         log.warn("解析字符类型长度失败: {}", parts[0]);
                     }
@@ -434,7 +446,8 @@ public class GaussDBAdapter implements DatabaseAdapter {
             case "bpchar":
                 return "char";
             case "nvarchar":
-                return "nvarchar";
+            case "nvarchar2":
+                return "nvarchar2";
             case "int2":
                 return "smallint";
             case "int4":
