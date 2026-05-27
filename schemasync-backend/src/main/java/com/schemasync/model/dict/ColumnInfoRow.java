@@ -67,6 +67,11 @@ public class ColumnInfoRow {
      * 字符集(字段级别)
      */
     private String charset;
+    
+    /**
+     * 字段名称(新) - 用于字段重命名场景
+     */
+    private String newColumnName;
 
     public String getTableName() { return tableName; }
     public void setTableName(String tableName) { this.tableName = tableName; }
@@ -92,4 +97,6 @@ public class ColumnInfoRow {
     public void setComment(String comment) { this.comment = comment; }
     public String getCharset() { return charset; }
     public void setCharset(String charset) { this.charset = charset; }
+    public String getNewColumnName() { return newColumnName; }
+    public void setNewColumnName(String newColumnName) { this.newColumnName = newColumnName; }
 }

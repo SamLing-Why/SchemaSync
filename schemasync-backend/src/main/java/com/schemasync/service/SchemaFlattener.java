@@ -125,6 +125,7 @@ public class SchemaFlattener {
                 row.setIsAutoIncrement(column.getIsAutoIncrement());
                 row.setComment(column.getComment());
                 row.setCharset(column.getCharset());
+                row.setNewColumnName(column.getNewColumnName());
                 
                 columns.add(row);
             }

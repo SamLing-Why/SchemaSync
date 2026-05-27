@@ -33,9 +33,10 @@ public class DdlController {
     @Operation(summary = "生成全量DDL脚本", description = "基于数据字典文件生成全量DDL")
     public ResponseEntity<byte[]> generateDdl(
             @RequestParam MultipartFile file,
-            @RequestParam(defaultValue = "excel") String fileType) {
+            @RequestParam(defaultValue = "excel") String fileType,
+            @RequestParam(defaultValue = "mysql") String databaseType) {
         try (InputStream inputStream = file.getInputStream()) {
-            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
+            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType, databaseType);
             
             byte[] ddlBytes = ddl.getBytes(StandardCharsets.UTF_8);
             
@@ -62,9 +63,10 @@ public class DdlController {
     @Operation(summary = "预览DDL脚本", description = "预览生成的DDL脚本")
     public ResponseEntity<String> previewDdl(
             @RequestParam MultipartFile file,
-            @RequestParam(defaultValue = "excel") String fileType) {
+            @RequestParam(defaultValue = "excel") String fileType,
+            @RequestParam(defaultValue = "mysql") String databaseType) {
         try (InputStream inputStream = file.getInputStream()) {
-            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
+            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType, databaseType);
             return ResponseEntity.ok(ddl);
         } catch (Exception e) {
             throw new RuntimeException("生成DDL失败: " + e.getMessage(), e);
@@ -75,9 +77,10 @@ public class DdlController {
     @Operation(summary = "下载DDL脚本", description = "下载生成的DDL脚本文件")
     public ResponseEntity<byte[]> downloadDdl(
             @RequestParam MultipartFile file,
-            @RequestParam(defaultValue = "excel") String fileType) {
+            @RequestParam(defaultValue = "excel") String fileType,
+            @RequestParam(defaultValue = "mysql") String databaseType) {
         try (InputStream inputStream = file.getInputStream()) {
-            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType);
+            String ddl = ddlGeneratorService.generateDdl(inputStream, fileType, databaseType);
             
             byte[] ddlBytes = ddl.getBytes(StandardCharsets.UTF_8);
             

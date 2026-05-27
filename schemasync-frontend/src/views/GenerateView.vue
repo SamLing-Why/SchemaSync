@@ -21,8 +21,10 @@
         </el-form-item>
 
         <el-form-item label="数据库类型">
-          <el-select v-model="form.databaseType">
+          <el-select v-model="form.databaseType" placeholder="请选择数据库类型">
             <el-option label="MySQL" value="mysql" />
+            <el-option label="GaussDB (MySQL兼容模式)" value="gaussdb_mysql" />
+            <el-option label="GaussDB (Oracle兼容模式)" value="gaussdb_oracle" />
           </el-select>
         </el-form-item>
 
@@ -60,6 +62,7 @@ import { Document, Download } from '@element-plus/icons-vue'
 const selectedFile = ref(null)
 const generating = ref(false)
 const ddlScript = ref('')
+const fileType = ref('excel')
 
 const form = ref({
   databaseType: 'mysql'

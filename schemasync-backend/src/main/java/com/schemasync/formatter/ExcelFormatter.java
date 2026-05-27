@@ -145,7 +145,7 @@ public class ExcelFormatter {
         
         // 表头
         Row headerRow = sheet.createRow(0);
-        String[] headers = {"表名", "字段名称", "数据类型", "长度", "精度", "是否允许NULL", "默认值", "是否主键", "是否自增", "字段注释", "字符集"};
+        String[] headers = {"表名", "字段名称", "数据类型", "长度", "精度", "是否允许NULL", "默认值", "是否主键", "是否自增", "字段注释", "字符集", "字段名称(新)"};
         for (int i = 0; i < headers.length; i++) {
             setCell(headerRow, i, headers[i], headerStyle);
         }
@@ -161,25 +161,29 @@ public class ExcelFormatter {
                 
                 // 对于numeric类型：长度=总位数(precision)，精度=小数位(scale)
                 // 对于varchar等类型：长度=字符长度
+                // 对于TEXT/BLOB/JSON等类型：不显示长度和精度
                 String lengthStr = "";
                 String precisionStr = "";
                 
-                if ("numeric".equalsIgnoreCase(column.getDataType()) || 
-                    "decimal".equalsIgnoreCase(column.getDataType())) {
-                    // numeric/decimal类型：precision是总位数，scale是小数位
-                    if (column.getPrecision() != null) {
-                        lengthStr = column.getPrecision().toString();
-                    }
-                    if (column.getScale() != null) {
-                        precisionStr = column.getScale().toString();
-                    }
-                } else {
-                    // 其他类型：length是字符长度
-                    if (column.getLength() != null) {
-                        lengthStr = column.getLength().toString();
-                    }
-                    if (column.getPrecision() != null) {
-                        precisionStr = column.getPrecision().toString();
+                // 先判断是否为不需要长度的类型
+                if (!isTypeWithoutLength(column.getDataType())) {
+                    if ("numeric".equalsIgnoreCase(column.getDataType()) || 
+                        "decimal".equalsIgnoreCase(column.getDataType())) {
+                        // numeric/decimal类型：precision是总位数，scale是小数位
+                        if (column.getPrecision() != null) {
+                            lengthStr = column.getPrecision().toString();
+                        }
+                        if (column.getScale() != null) {
+                            precisionStr = column.getScale().toString();
+                        }
+                    } else {
+                        // 其他类型：length是字符长度
+                        if (column.getLength() != null) {
+                            lengthStr = column.getLength().toString();
+                        }
+                        if (column.getPrecision() != null) {
+                            precisionStr = column.getPrecision().toString();
+                        }
                     }
                 }
                 
@@ -191,6 +195,7 @@ public class ExcelFormatter {
                 setCell(dataRow, 8, column.getIsAutoIncrement() != null && column.getIsAutoIncrement() ? "是" : "否", dataStyle);
                 setCell(dataRow, 9, column.getComment(), dataStyle);
                 setCell(dataRow, 10, column.getCharset(), dataStyle);
+                setCell(dataRow, 11, column.getNewColumnName() != null ? column.getNewColumnName() : "", dataStyle);
             }
         }
         
@@ -354,5 +359,49 @@ public class ExcelFormatter {
                 sheet.setColumnWidth(i, 50 * 256);
             }
         }
+    }
+    
+    /**
+     * 判断是否为不需要指定长度的类型
+     * MySQL中以下类型不需要（也不能）指定长度：
+     * - TEXT系列: TINYTEXT, TEXT, MEDIUMTEXT, LONGTEXT
+     * - BLOB系列: TINYBLOB, BLOB, MEDIUMBLOB, LONGBLOB
+     * - 其他: JSON, GEOMETRY, POINT, LINESTRING, POLYGON等
+     */
+    private boolean isTypeWithoutLength(String dataType) {
+        if (dataType == null) return false;
+        String upper = dataType.toUpperCase();
+        
+        // TEXT系列
+        if (upper.equals("TEXT") || upper.equals("TINYTEXT") || 
+            upper.equals("MEDIUMTEXT") || upper.equals("LONGTEXT")) {
+            return true;
+        }
+        
+        // BLOB系列
+        if (upper.equals("BLOB") || upper.equals("TINYBLOB") || 
+            upper.equals("MEDIUMBLOB") || upper.equals("LONGBLOB")) {
+            return true;
+        }
+        
+        // JSON类型
+        if (upper.equals("JSON")) {
+            return true;
+        }
+        
+        // 空间数据类型
+        if (upper.equals("GEOMETRY") || upper.equals("POINT") || 
+            upper.equals("LINESTRING") || upper.equals("POLYGON") ||
+            upper.equals("MULTIPOINT") || upper.equals("MULTILINESTRING") ||
+            upper.equals("MULTIPOLYGON") || upper.equals("GEOMETRYCOLLECTION")) {
+            return true;
+        }
+        
+        // ENUM和SET也不需要长度
+        if (upper.equals("ENUM") || upper.equals("SET")) {
+            return true;
+        }
+        
+        return false;
     }
 }

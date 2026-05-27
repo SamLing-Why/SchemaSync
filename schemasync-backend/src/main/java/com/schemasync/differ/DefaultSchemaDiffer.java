@@ -325,10 +325,13 @@ public class DefaultSchemaDiffer implements SchemaDiffer {
         if (oldIndexes == null) oldIndexes = Collections.emptyList();
         if (newIndexes == null) newIndexes = Collections.emptyList();
 
+        // 过滤掉主键索引（PRIMARY），主键通过主键约束管理，不作为普通索引对比
         Map<String, IndexDefinition> oldIndexMap = oldIndexes.stream()
+                .filter(idx -> !"PRIMARY".equalsIgnoreCase(idx.getIndexName()))
                 .collect(Collectors.toMap(IndexDefinition::getIndexName, i -> i, (a, b) -> a));
 
         Map<String, IndexDefinition> newIndexMap = newIndexes.stream()
+                .filter(idx -> !"PRIMARY".equalsIgnoreCase(idx.getIndexName()))
                 .collect(Collectors.toMap(IndexDefinition::getIndexName, i -> i, (a, b) -> a));
 
         // 新增索引

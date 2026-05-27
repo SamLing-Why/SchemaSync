@@ -200,6 +200,12 @@ public class SchemaDictionaryParser {
             column.setComment(getCellStringValue(row.getCell(9)));
             column.setCharset(getCellStringValue(row.getCell(10)));
             
+            // 解析字段名称(新) - 第11列（索引11）
+            String newColumnName = getCellStringValue(row.getCell(11));
+            if (!newColumnName.isEmpty()) {
+                column.setNewColumnName(newColumnName);
+            }
+            
             columnsByTable.computeIfAbsent(tableName, k -> new ArrayList<>()).add(column);
         }
         

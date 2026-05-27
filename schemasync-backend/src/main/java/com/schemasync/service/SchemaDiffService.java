@@ -102,6 +102,47 @@ public class SchemaDiffService {
             throw new RuntimeException("对比失败: " + e.getMessage(), e);
         }
     }
+    
+    /**
+     * 对比两个数据字典文件并格式化结果（用于导出）
+     * 
+     * @param oldFile 旧版本文件
+     * @param newFile 新版本文件
+     * @param format 输出格式
+     * @return 格式化后的字节数组
+     */
+    public byte[] compareAndFormat(MultipartFile oldFile, MultipartFile newFile, String format) {
+        try {
+            log.info("开始对比文件并格式化: {} vs {}", oldFile.getOriginalFilename(), newFile.getOriginalFilename());
+
+            // 1. 解析旧版本
+            SchemaDictionary oldDict = parseFile(oldFile);
+            log.debug("解析旧版本成功, 表数量: {}", 
+                    oldDict.getTables() != null ? oldDict.getTables().size() : 0);
+
+            // 2. 解析新版本
+            SchemaDictionary newDict = parseFile(newFile);
+            log.debug("解析新版本成功, 表数量: {}", 
+                    newDict.getTables() != null ? newDict.getTables().size() : 0);
+
+            // 3. 执行对比
+            SchemaDiff diff = schemaDiffer.compare(oldDict, newDict);
+            log.info("对比完成, 发现{}处变更", diff.getChanges().size());
+            
+            // 4. 格式化结果（传递newDict用于生成DDL）
+            byte[] data = formatDiff(diff, format, newDict);
+            
+            log.info("格式化完成, 输出格式: {}, 大小: {} bytes", format, data.length);
+            return data;
+
+        } catch (IOException e) {
+            log.error("读取文件失败", e);
+            throw new RuntimeException("读取文件失败: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("对比失败", e);
+            throw new RuntimeException("对比失败: " + e.getMessage(), e);
+        }
+    }
 
     /**
      * 对比两个数据字典对象
@@ -119,7 +160,19 @@ public class SchemaDiffService {
     public byte[] formatDiff(SchemaDiff diff, String format) {
         if ("excel".equalsIgnoreCase(format)) {
             // 使用简单表格格式导出差异列表
-            return exportDiffAsSimpleExcel(diff);
+            return exportDiffAsSimpleExcel(diff, null);
+        } else {
+            return jsonFormatter.formatDiff(diff);
+        }
+    }
+    
+    /**
+     * 格式化差异结果为指定格式（带新字典）
+     */
+    public byte[] formatDiff(SchemaDiff diff, String format, SchemaDictionary newDict) {
+        if ("excel".equalsIgnoreCase(format)) {
+            // 使用简单表格格式导出差异列表
+            return exportDiffAsSimpleExcel(diff, newDict);
         } else {
             return jsonFormatter.formatDiff(diff);
         }
@@ -141,8 +194,13 @@ public class SchemaDiffService {
     
     /**
      * 从对比结果生成DDL脚本（差异化）
+     * 
+     * @param oldFile 旧版本文件
+     * @param newFile 新版本文件
+     * @param databaseType 数据库类型(mysql/gaussdb_mysql/gaussdb_oracle)
+     * @return DDL SQL字节数组
      */
-    public byte[] generateDdlFromDiff(MultipartFile oldFile, MultipartFile newFile) {
+    public byte[] generateDdlFromDiff(MultipartFile oldFile, MultipartFile newFile, String databaseType) {
         try {
             // 1. 解析两个版本
             SchemaDictionary oldDict = parseFile(oldFile);
@@ -151,8 +209,8 @@ public class SchemaDiffService {
             // 2. 执行对比
             SchemaDiff diff = schemaDiffer.compare(oldDict, newDict);
             
-            // 3. 只生成新增和修改的表的DDL
-            String ddl = generateDdlForChangedTables(newDict, diff);
+            // 3. 根据数据库类型生成DDL
+            String ddl = generateDdlForChangedTables(newDict, oldDict, diff, databaseType);
             
             return ddl.getBytes("UTF-8");
         } catch (Exception e) {
@@ -162,12 +220,44 @@ public class SchemaDiffService {
     }
     
     /**
-     * 为变更的表生成DDL（根据变更类型生成精确DDL）
+     * 从对比结果生成DDL脚本（差异化，兼容旧接口，默认MySQL）
+     */
+    public byte[] generateDdlFromDiff(MultipartFile oldFile, MultipartFile newFile) {
+        return generateDdlFromDiff(oldFile, newFile, "mysql");
+    }
+    
+    /**
+     * 为变更的表生成DDL（根据变更类型生成精确DDL）- 旧版本兼容
      */
     private String generateDdlForChangedTables(SchemaDictionary newDict, SchemaDiff diff) {
+        return generateDdlForChangedTables(newDict, null, diff, "mysql");
+    }
+    
+    /**
+     * 为变更的表生成DDL（根据变更类型生成精确DDL）- 支持数据库类型
+     */
+    private String generateDdlForChangedTables(SchemaDictionary newDict, SchemaDictionary oldDict, 
+                                                SchemaDiff diff, String databaseType) {
+        // 根据数据库类型选择生成策略
+        String dbType = databaseType != null ? databaseType.toLowerCase() : "mysql";
+        
         StringBuilder sql = new StringBuilder();
+        String dbTypeLabel;
+        switch (dbType) {
+            case "gaussdb_mysql":
+                dbTypeLabel = "GaussDB (MySQL兼容模式)";
+                break;
+            case "gaussdb_oracle":
+                dbTypeLabel = "GaussDB (Oracle兼容模式)";
+                break;
+            default:
+                dbTypeLabel = "MySQL";
+                break;
+        }
+        
         sql.append("-- ============================================\n");
         sql.append("-- SchemaSync 差异化DDL脚本\n");
+        sql.append("-- 数据库类型: ").append(dbTypeLabel).append("\n");
         sql.append("-- 生成时间: ").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date())).append("\n");
         sql.append("-- ============================================\n\n");
         
@@ -176,22 +266,206 @@ public class SchemaDiffService {
             return sql.toString();
         }
         
-        // 按表名分组变更
+        switch (dbType) {
+            case "mysql":
+            case "gaussdb_mysql":
+                return generateMySqlStyleDiffDdl(sql, newDict, diff);
+            case "gaussdb_oracle":
+                return generateGaussDbOracleStyleDiffDdl(sql, newDict, diff);
+            default:
+                return generateMySqlStyleDiffDdl(sql, newDict, diff);
+        }
+    }
+    
+    /**
+     * 为单个变更生成DDL（统一方法，供Excel和文件使用）
+     * 
+     * @param change 变更信息
+     * @param newTable 新版本的表定义
+     * @param databaseType 数据库类型
+     * @return DDL语句
+     */
+    private String generateDdlForSingleChange(SchemaChange change, TableDefinition newTable, String databaseType) {
+        String dbType = databaseType != null ? databaseType.toLowerCase() : "mysql";
+        
+        switch (dbType) {
+            case "mysql":
+            case "gaussdb_mysql":
+                return generateMySqlStyleDdlForChange(change, newTable);
+            case "gaussdb_oracle":
+                return generateGaussDbOracleDdlForChange(change, newTable);
+            default:
+                return generateMySqlStyleDdlForChange(change, newTable);
+        }
+    }
+    
+    /**
+     * 生成MySQL风格的单条DDL
+     */
+    private String generateMySqlStyleDdlForChange(SchemaChange change, TableDefinition newTable) {
+        String tableName = change.getTableName();
+        com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
+        
+        if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
+            if (newTable != null) {
+                if ("VIEW".equalsIgnoreCase(newTable.getTableType())) {
+                    return ddlGeneratorService.generateCreateView(newTable).trim();
+                } else {
+                    return ddlGeneratorService.generateCreateTable(newTable).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_DROP) {
+            return "-- DROP TABLE `" + tableName + "`; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateAddColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_DROP) {
+            if (change.getColumnName() != null) {
+                return "-- ALTER TABLE `" + tableName + "` DROP COLUMN `" + change.getColumnName() + "`; -- 已注释，请确认后手动执行";
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateModifyColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_ADD) {
+            // 新增索引：从details中获取IndexDefinition
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return generateCreateIndexSql(tableName, index).trim();
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_DROP) {
+            // 删除索引：从 details中获取IndexDefinition
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return ("ALTER TABLE `" + tableName + "` DROP INDEX `" + index.getIndexName() + "`;").trim();
+            }
+            return "-- ALTER TABLE `" + tableName + "` DROP INDEX ...; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_MODIFY) {
+            // 修改索引：先删除旧索引，再创建新索引
+            if (change.getDetails() instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> details = (Map<String, Object>) change.getDetails();
+                String indexName = (String) details.get("indexName");
+                Object newValue = details.get("newValue");
+                
+                StringBuilder ddl = new StringBuilder();
+                ddl.append("-- 修改索引: 先删除旧索引，再创建新索引\n");
+                ddl.append("ALTER TABLE `" + tableName + "` DROP INDEX `" + indexName + "`;");
+                
+                if (newValue instanceof com.schemasync.model.dict.IndexDefinition) {
+                    com.schemasync.model.dict.IndexDefinition newIndex = (com.schemasync.model.dict.IndexDefinition) newValue;
+                    ddl.append("\n").append(generateCreateIndexSql(tableName, newIndex).trim());
+                }
+                return ddl.toString().trim();
+            }
+            return "-- 修改索引: " + tableName + " -- 请手动处理";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_MODIFY) {
+            return "-- 表属性变更，请手动处理: " + (change.getDetails() != null ? change.getDetails().toString() : "");
+        }
+        
+        return "";
+    }
+    
+    /**
+     * 生成GaussDB Oracle风格的单条DDL
+     */
+    private String generateGaussDbOracleDdlForChange(SchemaChange change, TableDefinition newTable) {
+        String tableName = change.getTableName();
+        com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
+        
+        if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
+            if (newTable != null && !"VIEW".equalsIgnoreCase(newTable.getTableType())) {
+                return generateGaussDbOracleCreateTableForDiff(newTable).trim();
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_DROP) {
+            return "-- DROP TABLE " + tableName + "; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateGaussDbOracleAddColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_DROP) {
+            if (change.getColumnName() != null) {
+                return "-- ALTER TABLE " + tableName + " DROP COLUMN " + change.getColumnName() + "; -- 已注释，请确认后手动执行";
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateGaussDbOracleModifyColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_ADD) {
+            // 新增索引（Oracle风格）
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return generateGaussDbOracleCreateIndexSql(tableName, index).trim();
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_DROP) {
+            // 删除索引（Oracle风格）
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return ("DROP INDEX " + index.getIndexName() + ";").trim();
+            }
+            return "-- DROP INDEX ...; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_MODIFY) {
+            // 修改索引：先删除旧索引，再创建新索引（Oracle风格）
+            if (change.getDetails() instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> details = (Map<String, Object>) change.getDetails();
+                String indexName = (String) details.get("indexName");
+                Object newValue = details.get("newValue");
+                
+                StringBuilder ddl = new StringBuilder();
+                ddl.append("-- 修改索引: 先删除旧索引，再创建新索引\n");
+                ddl.append("DROP INDEX " + indexName + ";");
+                
+                if (newValue instanceof com.schemasync.model.dict.IndexDefinition) {
+                    com.schemasync.model.dict.IndexDefinition newIndex = (com.schemasync.model.dict.IndexDefinition) newValue;
+                    ddl.append("\n").append(generateGaussDbOracleCreateIndexSql(tableName, newIndex).trim());
+                }
+                return ddl.toString().trim();
+            }
+            return "-- 修改索引: " + tableName + " -- 请手动处理";
+        }
+        
+        return "";
+    }
+    
+    /**
+     * 生成MySQL风格的差异化DDL
+     */
+    private String generateMySqlStyleDiffDdl(StringBuilder sql, SchemaDictionary newDict, SchemaDiff diff) {
         Map<String, List<SchemaChange>> changesByTable = diff.getChanges().stream()
             .collect(Collectors.groupingBy(SchemaChange::getTableName));
         
-        // 为每个变更的表生成DDL
         for (Map.Entry<String, List<SchemaChange>> entry : changesByTable.entrySet()) {
             String tableName = entry.getKey();
             List<SchemaChange> tableChanges = entry.getValue();
-            
-            // 查找新版本的表定义
             TableDefinition newTable = findTableByName(newDict, tableName);
             
             for (SchemaChange change : tableChanges) {
                 com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
                 if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
-                    // 新增表：生成CREATE TABLE
                     sql.append("-- 变更类型: 新增表\n");
                     if (newTable != null) {
                         if ("VIEW".equalsIgnoreCase(newTable.getTableType())) {
@@ -201,21 +475,7 @@ public class SchemaDiffService {
                         }
                     }
                     sql.append("\n\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_DROP) {
-                    // 删除表：生成注释掉的DROP TABLE
-                    sql.append("-- 变更类型: 删除表 (已注释)\n");
-                    sql.append("-- DROP TABLE `").append(tableName).append("`;\n");
-                    sql.append("\n\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_MODIFY) {
-                    // 修改表属性：生成ALTER TABLE
-                    sql.append("-- 变更类型: 修改表\n");
-                    if (newTable != null && change.getDetails() != null) {
-                        sql.append("-- 详情: ").append(change.getDetails().toString()).append("\n");
-                        sql.append("-- 请手动修改表属性\n");
-                    }
-                    sql.append("\n");
                 } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
-                    // 新增字段：生成ALTER TABLE ADD COLUMN
                     sql.append("-- 变更类型: 新增字段\n");
                     if (newTable != null && change.getColumnName() != null) {
                         ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
@@ -224,16 +484,7 @@ public class SchemaDiffService {
                         }
                     }
                     sql.append("\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_DROP) {
-                    // 删除字段：生成注释掉的ALTER TABLE DROP COLUMN
-                    sql.append("-- 变更类型: 删除字段 (已注释)\n");
-                    if (change.getColumnName() != null) {
-                        sql.append("-- ALTER TABLE `").append(tableName)
-                           .append("` DROP COLUMN `").append(change.getColumnName()).append("`;\n");
-                    }
-                    sql.append("\n");
                 } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
-                    // 修改字段：生成ALTER TABLE MODIFY COLUMN
                     sql.append("-- 变更类型: 修改字段\n");
                     if (newTable != null && change.getColumnName() != null) {
                         ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
@@ -242,56 +493,194 @@ public class SchemaDiffService {
                         }
                     }
                     sql.append("\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_ADD) {
-                    // 新增索引：生成CREATE INDEX
-                    sql.append("-- 变更类型: 新增索引\n");
-                    if (newTable != null && change.getDetails() != null) {
-                        com.schemasync.model.dict.IndexDefinition index = extractIndexDefinition(change.getDetails());
-                        if (index != null) {
-                            sql.append(generateCreateIndexSql(tableName, index));
-                        } else {
-                            sql.append("-- 警告: 无法提取索引定义\n");
-                        }
-                    }
-                    sql.append("\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_DROP) {
-                    // 删除索引：生成注释掉的DROP INDEX
-                    sql.append("-- 变更类型: 删除索引 (已注释)\n");
-                    if (change.getDetails() != null) {
-                        com.schemasync.model.dict.IndexDefinition index = extractIndexDefinition(change.getDetails());
-                        if (index != null) {
-                            sql.append("-- ALTER TABLE `").append(tableName)
-                               .append("` DROP INDEX `").append(index.getIndexName()).append("`;\n");
-                        }
-                    }
-                    sql.append("\n");
-                } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_MODIFY) {
-                    // 修改索引：删除旧索引+创建新索引
-                    sql.append("-- 变更类型: 修改索引\n");
-                    if (change.getDetails() instanceof java.util.Map) {
-                        java.util.Map<?, ?> map = (java.util.Map<?, ?>) change.getDetails();
-                        if (map.containsKey("oldValue") && map.containsKey("newValue")) {
-                            com.schemasync.model.dict.IndexDefinition oldIndex = extractIndexDefinition(map.get("oldValue"));
-                            com.schemasync.model.dict.IndexDefinition newIndex = extractIndexDefinition(map.get("newValue"));
-                            if (oldIndex != null) {
-                                sql.append("-- 删除旧索引\n");
-                                sql.append("ALTER TABLE `").append(tableName)
-                                   .append("` DROP INDEX `").append(oldIndex.getIndexName()).append("`;\n");
-                            }
-                            if (newIndex != null) {
-                                sql.append("-- 创建新索引\n");
-                                sql.append(generateCreateIndexSql(tableName, newIndex));
-                            }
-                        }
-                    }
-                    sql.append("\n");
-                } else {
-                    sql.append("-- 未知变更类型: ").append(changeType).append("\n\n");
                 }
             }
         }
         
         return sql.toString();
+    }
+    
+    /**
+     * 生成GaussDB Oracle风格的差异化DDL
+     */
+    private String generateGaussDbOracleStyleDiffDdl(StringBuilder sql, SchemaDictionary newDict, SchemaDiff diff) {
+        Map<String, List<SchemaChange>> changesByTable = diff.getChanges().stream()
+            .collect(Collectors.groupingBy(SchemaChange::getTableName));
+        
+        for (Map.Entry<String, List<SchemaChange>> entry : changesByTable.entrySet()) {
+            String tableName = entry.getKey();
+            List<SchemaChange> tableChanges = entry.getValue();
+            TableDefinition newTable = findTableByName(newDict, tableName);
+            
+            for (SchemaChange change : tableChanges) {
+                com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
+                if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
+                    sql.append("-- 变更类型: 新增表\n");
+                    if (newTable != null && !"VIEW".equalsIgnoreCase(newTable.getTableType())) {
+                        sql.append(generateGaussDbOracleCreateTableForDiff(newTable));
+                    }
+                    sql.append("\n\n");
+                } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
+                    sql.append("-- 变更类型: 新增字段\n");
+                    if (newTable != null && change.getColumnName() != null) {
+                        ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                        if (newColumn != null) {
+                            sql.append(generateGaussDbOracleAddColumnSql(tableName, newColumn));
+                        }
+                    }
+                    sql.append("\n");
+                } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
+                    sql.append("-- 变更类型: 修改字段\n");
+                    if (newTable != null && change.getColumnName() != null) {
+                        ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                        if (newColumn != null) {
+                            sql.append(generateGaussDbOracleModifyColumnSql(tableName, newColumn));
+                        }
+                    }
+                    sql.append("\n");
+                }
+            }
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成GaussDB Oracle风格的CREATE TABLE（用于差异化DDL）
+     */
+    private String generateGaussDbOracleCreateTableForDiff(TableDefinition table) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE TABLE ").append(table.getTableName()).append(" (\n");
+        
+        List<String> columnDefs = new ArrayList<>();
+        if (table.getColumns() != null) {
+            for (ColumnDefinition column : table.getColumns()) {
+                columnDefs.add("  " + generateGaussDbOracleColumnDefForDiff(column));
+            }
+        }
+        
+        if (table.getColumns() != null) {
+            List<String> pkColumns = table.getColumns().stream()
+                .filter(c -> c.getIsPrimaryKey() != null && c.getIsPrimaryKey())
+                .map(col -> col.getEffectiveName().toUpperCase())
+                .collect(Collectors.toList());
+            if (!pkColumns.isEmpty()) {
+                columnDefs.add("  PRIMARY KEY (" + String.join(", ", pkColumns) + ")");
+            }
+        }
+        
+        sql.append(String.join(",\n", columnDefs));
+        sql.append("\n);\n");
+        
+        if (table.getTableComment() != null && !table.getTableComment().isEmpty()) {
+            sql.append("COMMENT ON TABLE ").append(table.getTableName())
+               .append(" IS '").append(table.getTableComment().replace("'", "\\'")).append("';\n");
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成GaussDB Oracle风格的字段定义（用于差异化DDL）
+     */
+    private String generateGaussDbOracleColumnDefForDiff(ColumnDefinition column) {
+        StringBuilder def = new StringBuilder();
+        def.append(column.getEffectiveName().toUpperCase()).append(" ");
+        
+        String dataType = column.getDataType();
+        if (dataType != null) {
+            def.append(convertToOracleTypeForDiff(dataType));
+        } else {
+            def.append("VARCHAR2");
+        }
+        
+        if (column.getPrecision() != null && column.getScale() != null) {
+            def.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+        } else if (column.getLength() != null && column.getLength() > 0) {
+            def.append("(").append(column.getLength()).append(")");
+        }
+        
+        if (column.getNullable() != null && !column.getNullable()) {
+            def.append(" NOT NULL");
+        }
+        
+        if (column.getDefaultValue() != null) {
+            String defaultValue = column.getDefaultValue().toString();
+            if (!defaultValue.toLowerCase().equals("null")) {
+                if (isNumericTypeForDiff(dataType)) {
+                    def.append(" DEFAULT ").append(defaultValue);
+                } else {
+                    def.append(" DEFAULT '").append(defaultValue.replace("'", "\\'")).append("'");
+                }
+            }
+        }
+        
+        return def.toString();
+    }
+    
+    /**
+     * GaussDB Oracle风格：新增字段
+     */
+    private String generateGaussDbOracleAddColumnSql(String tableName, ColumnDefinition column) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE ").append(tableName).append(" ADD (");
+        sql.append(generateGaussDbOracleColumnDefForDiff(column));
+        sql.append(");\n");
+        return sql.toString();
+    }
+    
+    /**
+     * GaussDB Oracle风格：修改字段
+     */
+    private String generateGaussDbOracleModifyColumnSql(String tableName, ColumnDefinition column) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE ").append(tableName).append(" MODIFY (");
+        sql.append(generateGaussDbOracleColumnDefForDiff(column));
+        sql.append(");\n");
+        return sql.toString();
+    }
+    
+    /**
+     * 将MySQL类型转换为Oracle类型（用于差异化DDL）
+     */
+    private String convertToOracleTypeForDiff(String mysqlType) {
+        if (mysqlType == null) return "VARCHAR2";
+        String upper = mysqlType.toUpperCase();
+        switch (upper) {
+            case "VARCHAR": case "VARCHAR2": case "NVARCHAR": case "NVARCHAR2":
+                return "VARCHAR2";
+            case "TEXT": case "LONGTEXT": case "MEDIUMTEXT":
+                return "CLOB";
+            case "INT": case "INTEGER": case "TINYINT": case "SMALLINT": case "MEDIUMINT":
+                return "NUMBER";
+            case "BIGINT": return "NUMBER(19)";
+            case "FLOAT": return "FLOAT";
+            case "DOUBLE": return "DOUBLE PRECISION";
+            case "DECIMAL": case "NUMERIC": case "NUMBER":
+                return "NUMBER";
+            case "DATETIME": case "TIMESTAMP":
+                return "TIMESTAMP";
+            case "DATE": return "DATE";
+            case "BLOB": case "LONGBLOB": case "MEDIUMBLOB": case "TINYBLOB":
+                return "BLOB";
+            case "BOOLEAN": case "BOOL": case "BIT":
+                return "NUMBER(1)";
+            default:
+                return upper;
+        }
+    }
+    
+    /**
+     * 判断是否为数值类型（用于差异化DDL）
+     */
+    private boolean isNumericTypeForDiff(String dataType) {
+        if (dataType == null) return false;
+        String upper = dataType.toUpperCase();
+        return upper.equals("INT") || upper.equals("INTEGER") || 
+               upper.equals("BIGINT") || upper.equals("SMALLINT") ||
+               upper.equals("TINYINT") || upper.equals("DECIMAL") ||
+               upper.equals("NUMERIC") || upper.equals("FLOAT") ||
+               upper.equals("DOUBLE") || upper.startsWith("NUMBER");
     }
     
     /**
@@ -366,14 +755,20 @@ public class SchemaDiffService {
     private String generateAddColumnSql(String tableName, ColumnDefinition column) {
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE `").append(tableName).append("` ADD COLUMN `");
-        sql.append(column.getColumnName()).append("` ");
+        // 使用getEffectiveName()获取实际字段名（支持重命名）
+        sql.append(column.getEffectiveName()).append("` ");
         
         // 数据类型
-        sql.append(column.getDataType().toUpperCase());
-        if (column.getPrecision() != null && column.getScale() != null) {
-            sql.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
-        } else if (column.getLength() != null && column.getLength() > 0) {
-            sql.append("(").append(column.getLength()).append(")");
+        String dataType = column.getDataType().toUpperCase();
+        sql.append(dataType);
+        
+        // 添加长度/精度（仅对需要的类型）
+        if (!isTypeWithoutLengthForDiff(dataType)) {
+            if (column.getPrecision() != null && column.getScale() != null) {
+                sql.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+            } else if (column.getLength() != null && column.getLength() > 0) {
+                sql.append("(").append(column.getLength()).append(")");
+            }
         }
         
         // 约束
@@ -397,14 +792,20 @@ public class SchemaDiffService {
     private String generateModifyColumnSql(String tableName, ColumnDefinition column) {
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE `").append(tableName).append("` MODIFY COLUMN `");
-        sql.append(column.getColumnName()).append("` ");
+        // 使用getEffectiveName()获取实际字段名（支持重命名）
+        sql.append(column.getEffectiveName()).append("` ");
         
         // 数据类型
-        sql.append(column.getDataType().toUpperCase());
-        if (column.getPrecision() != null && column.getScale() != null) {
-            sql.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
-        } else if (column.getLength() != null && column.getLength() > 0) {
-            sql.append("(").append(column.getLength()).append(")");
+        String dataType = column.getDataType().toUpperCase();
+        sql.append(dataType);
+        
+        // 添加长度/精度（仅对需要的类型）
+        if (!isTypeWithoutLengthForDiff(dataType)) {
+            if (column.getPrecision() != null && column.getScale() != null) {
+                sql.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+            } else if (column.getLength() != null && column.getLength() > 0) {
+                sql.append("(").append(column.getLength()).append(")");
+            }
         }
         
         // 约束
@@ -449,9 +850,36 @@ public class SchemaDiffService {
     }
     
     /**
+     * 生成GaussDB Oracle风格的创建索引SQL
+     */
+    private String generateGaussDbOracleCreateIndexSql(String tableName, com.schemasync.model.dict.IndexDefinition index) {
+        StringBuilder sql = new StringBuilder();
+        
+        // 判断是否唯一索引
+        if (index.getIsUnique() != null && index.getIsUnique()) {
+            sql.append("CREATE UNIQUE INDEX ");
+        } else {
+            sql.append("CREATE INDEX ");
+        }
+        
+        // Oracle风格：索引名大写，不使用反引号
+        sql.append(index.getIndexName().toUpperCase()).append(" ON ").append(tableName.toUpperCase()).append(" (");
+        
+        // 索引字段（大写）
+        if (index.getColumns() != null && !index.getColumns().isEmpty()) {
+            sql.append(String.join(", ", index.getColumns().stream()
+                .map(String::toUpperCase)
+                .collect(java.util.stream.Collectors.toList())));
+        }
+        
+        sql.append(");\n");
+        return sql.toString();
+    }
+    
+    /**
      * 导出差异为简单Excel格式
      */
-    private byte[] exportDiffAsSimpleExcel(SchemaDiff diff) {
+    private byte[] exportDiffAsSimpleExcel(SchemaDiff diff, SchemaDictionary newDict) {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("差异列表");
             
@@ -461,14 +889,15 @@ public class SchemaDiffService {
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
             
-            // 创建表头 - 增加12个新列
+            // 创建表头 - DDL列放在详情列后面
             Row headerRow = sheet.createRow(0);
             String[] headers = {
-                "变更类型", "表名", "字段名", "严重程度", "详情",
+                "变更类型", "表名", "字段名", "严重程度",
                 "数据类型(旧)", "数据类型(新)", "数据类型是否发生变化",
                 "长度(旧)", "长度(新)", "长度是否发生变化",
                 "精度(旧)", "精度(新)", "精度是否发生变化",
-                "字段注释(旧)", "字段注释(新)", "字段注释是否发生变化"
+                "字段注释(旧)", "字段注释(新)", "字段注释是否发生变化",
+                "详情", "DDL语句"
             };
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
@@ -482,37 +911,43 @@ public class SchemaDiffService {
                     SchemaChange change = diff.getChanges().get(i);
                     Row row = sheet.createRow(i + 1);
                     
-                    // 基础列
+                    // 基础列（不含详情和DDL）
                     row.createCell(0).setCellValue(getChangeTypeLabel(change.getChangeType()));
                     row.createCell(1).setCellValue(change.getTableName() != null ? change.getTableName() : "");
                     row.createCell(2).setCellValue(change.getColumnName() != null ? change.getColumnName() : "");
                     row.createCell(3).setCellValue(getSeverityLabel(change.getSeverity()));
-                    row.createCell(4).setCellValue(formatChangeDetails(change.getDetails()));
                     
-                    // 新增12个列
-                    // 数据类型
-                    row.createCell(5).setCellValue(change.getOldDataType() != null ? change.getOldDataType() : "");
-                    row.createCell(6).setCellValue(change.getNewDataType() != null ? change.getNewDataType() : "");
-                    row.createCell(7).setCellValue(change.getOldDataType() != null && change.getNewDataType() != null 
+                    // 数据类型（列4-6）
+                    row.createCell(4).setCellValue(change.getOldDataType() != null ? change.getOldDataType() : "");
+                    row.createCell(5).setCellValue(change.getNewDataType() != null ? change.getNewDataType() : "");
+                    row.createCell(6).setCellValue(change.getOldDataType() != null && change.getNewDataType() != null 
                             && !change.getOldDataType().equals(change.getNewDataType()) ? "是" : "否");
                     
-                    // 长度
-                    row.createCell(8).setCellValue(change.getOldLength() != null ? change.getOldLength().toString() : "");
-                    row.createCell(9).setCellValue(change.getNewLength() != null ? change.getNewLength().toString() : "");
-                    row.createCell(10).setCellValue(change.getOldLength() != null && change.getNewLength() != null 
+                    // 长度（列7-9）
+                    row.createCell(7).setCellValue(change.getOldLength() != null ? change.getOldLength().toString() : "");
+                    row.createCell(8).setCellValue(change.getNewLength() != null ? change.getNewLength().toString() : "");
+                    row.createCell(9).setCellValue(change.getOldLength() != null && change.getNewLength() != null 
                             && !change.getOldLength().equals(change.getNewLength()) ? "是" : "否");
                     
-                    // 精度
-                    row.createCell(11).setCellValue(change.getOldPrecision() != null ? change.getOldPrecision().toString() : "");
-                    row.createCell(12).setCellValue(change.getNewPrecision() != null ? change.getNewPrecision().toString() : "");
-                    row.createCell(13).setCellValue(change.getOldPrecision() != null && change.getNewPrecision() != null 
+                    // 精度（列10-12）
+                    row.createCell(10).setCellValue(change.getOldPrecision() != null ? change.getOldPrecision().toString() : "");
+                    row.createCell(11).setCellValue(change.getNewPrecision() != null ? change.getNewPrecision().toString() : "");
+                    row.createCell(12).setCellValue(change.getOldPrecision() != null && change.getNewPrecision() != null 
                             && !change.getOldPrecision().equals(change.getNewPrecision()) ? "是" : "否");
                     
-                    // 字段注释
-                    row.createCell(14).setCellValue(change.getOldComment() != null ? change.getOldComment() : "");
-                    row.createCell(15).setCellValue(change.getNewComment() != null ? change.getNewComment() : "");
-                    row.createCell(16).setCellValue(change.getOldComment() != null && change.getNewComment() != null 
+                    // 字段注释（列13-15）
+                    row.createCell(13).setCellValue(change.getOldComment() != null ? change.getOldComment() : "");
+                    row.createCell(14).setCellValue(change.getNewComment() != null ? change.getNewComment() : "");
+                    row.createCell(15).setCellValue(change.getOldComment() != null && change.getNewComment() != null 
                             && !change.getOldComment().equals(change.getNewComment()) ? "是" : "否");
+                    
+                    // 详情列（列16）
+                    row.createCell(16).setCellValue(formatChangeDetails(change.getDetails()));
+                    
+                    // DDL列（列17）- 使用统一的DDL生成方法
+                    TableDefinition tableDef = newDict != null ? findTableByName(newDict, change.getTableName()) : null;
+                    String ddl = generateDdlForSingleChange(change, tableDef, "mysql");
+                    row.createCell(17).setCellValue(ddl);
                 }
             }
             
@@ -745,5 +1180,45 @@ public class SchemaDiffService {
         dictionary.setTables(tables);
         
         return dictionary;
+    }
+    
+    /**
+     * 判断是否为不需要指定长度的类型（用于差异化DDL）
+     */
+    private boolean isTypeWithoutLengthForDiff(String dataType) {
+        if (dataType == null) return false;
+        String upper = dataType.toUpperCase();
+        
+        // TEXT系列
+        if (upper.equals("TEXT") || upper.equals("TINYTEXT") || 
+            upper.equals("MEDIUMTEXT") || upper.equals("LONGTEXT")) {
+            return true;
+        }
+        
+        // BLOB系列
+        if (upper.equals("BLOB") || upper.equals("TINYBLOB") || 
+            upper.equals("MEDIUMBLOB") || upper.equals("LONGBLOB")) {
+            return true;
+        }
+        
+        // JSON类型
+        if (upper.equals("JSON")) {
+            return true;
+        }
+        
+        // 空间数据类型
+        if (upper.equals("GEOMETRY") || upper.equals("POINT") || 
+            upper.equals("LINESTRING") || upper.equals("POLYGON") ||
+            upper.equals("MULTIPOINT") || upper.equals("MULTILINESTRING") ||
+            upper.equals("MULTIPOLYGON") || upper.equals("GEOMETRYCOLLECTION")) {
+            return true;
+        }
+        
+        // ENUM和SET
+        if (upper.equals("ENUM") || upper.equals("SET")) {
+            return true;
+        }
+        
+        return false;
     }
 }

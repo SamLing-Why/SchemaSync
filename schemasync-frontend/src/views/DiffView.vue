@@ -36,6 +36,14 @@
           </el-upload>
         </el-form-item>
 
+        <el-form-item label="数据库类型">
+          <el-select v-model="databaseType" placeholder="请选择数据库类型" style="width: 100%;">
+            <el-option label="MySQL" value="mysql" />
+            <el-option label="GaussDB (MySQL兼容模式)" value="gaussdb_mysql" />
+            <el-option label="GaussDB (Oracle兼容模式)" value="gaussdb_oracle" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="handleCompare" :loading="comparing">
             <el-icon><Compare /></el-icon>
@@ -99,6 +107,7 @@ const newFileBuffer = ref(null)  // 保存文件内容
 const comparing = ref(false)
 const generatingDdl = ref(false)
 const diffResult = ref(null)
+const databaseType = ref('mysql')  // 数据库类型，默认MySQL
 
 const handleOldFile = async (file) => {
   oldFile.value = file.raw
@@ -218,6 +227,7 @@ const generateDdl = async () => {
     const formData = new FormData()
     formData.append('oldFile', oldFile.value)
     formData.append('newFile', newFile.value)
+    formData.append('databaseType', databaseType.value)
 
     const response = await fetch('/api/diff/ddl', {
       method: 'POST',

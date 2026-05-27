@@ -40,11 +40,8 @@ public class DiffController {
             throw new RuntimeException("请上传两个文件");
         }
 
-        // 执行对比
-        SchemaDiff diff = diffService.compareFiles(oldFile, newFile);
-
-        // 按指定格式输出
-        byte[] data = diffService.formatDiff(diff, exportFormat);
+        // 执行对比并格式化（内部会传递newDict用于生成DDL）
+        byte[] data = diffService.compareAndFormat(oldFile, newFile, exportFormat);
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();
@@ -82,13 +79,14 @@ public class DiffController {
     @Operation(summary = "生成差异化DDL脚本", description = "基于两个版本的对比结果生成DDL脚本")
     public ResponseEntity<byte[]> generateDdl(
             @RequestParam("oldFile") MultipartFile oldFile,
-            @RequestParam("newFile") MultipartFile newFile) {
+            @RequestParam("newFile") MultipartFile newFile,
+            @RequestParam(defaultValue = "mysql") String databaseType) {
         
         if (oldFile.isEmpty() || newFile.isEmpty()) {
             throw new RuntimeException("请上传两个文件");
         }
 
-        byte[] data = diffService.generateDdlFromDiff(oldFile, newFile);
+        byte[] data = diffService.generateDdlFromDiff(oldFile, newFile, databaseType);
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();

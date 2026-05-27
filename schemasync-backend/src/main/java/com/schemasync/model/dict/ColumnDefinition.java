@@ -68,6 +68,12 @@ public class ColumnDefinition {
      * 字段位置
      */
     private Integer ordinalPosition;
+    
+    /**
+     * 字段名称(新) - 用于字段重命名场景
+     * 如果不为空，DDL生成时使用此名称替代columnName
+     */
+    private String newColumnName;
 
     public String getColumnName() { return columnName; }
     public void setColumnName(String columnName) { this.columnName = columnName; }
@@ -93,4 +99,17 @@ public class ColumnDefinition {
     public void setCharset(String charset) { this.charset = charset; }
     public Integer getOrdinalPosition() { return ordinalPosition; }
     public void setOrdinalPosition(Integer ordinalPosition) { this.ordinalPosition = ordinalPosition; }
+    public String getNewColumnName() { return newColumnName; }
+    public void setNewColumnName(String newColumnName) { this.newColumnName = newColumnName; }
+    
+    /**
+     * 获取实际使用的字段名称
+     * 如果newColumnName不为空，返回newColumnName；否则返回columnName
+     */
+    public String getEffectiveName() {
+        if (newColumnName != null && !newColumnName.trim().isEmpty()) {
+            return newColumnName.trim();
+        }
+        return columnName;
+    }
 }
