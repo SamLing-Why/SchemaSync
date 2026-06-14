@@ -34,6 +34,10 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('menu.generate') }}</span>
           </el-menu-item>
+          <el-menu-item index="/settable">
+            <el-icon><Grid /></el-icon>
+            <span>{{ t('menu.settable') }}</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       
@@ -50,7 +54,7 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { Connection as Database, Setting, Download, Switch as Compare, Files as Document } from '@element-plus/icons-vue'
+import { Connection as Database, Setting, Download, Switch as Compare, Files as Document, Grid } from '@element-plus/icons-vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 
 const { t } = useI18n()

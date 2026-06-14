@@ -3,6 +3,7 @@ import ConfigView from '../views/ConfigView.vue'
 import ExportView from '../views/ExportView.vue'
 import DiffView from '../views/DiffView.vue'
 import GenerateView from '../views/GenerateView.vue'
+import SetTableView from '../views/SetTableView.vue'
 
 const routes = [
   {
@@ -28,6 +29,11 @@ const routes = [
     path: '/generate',
     name: 'Generate',
     component: GenerateView
+  },
+  {
+    path: '/settable',
+    name: 'SetTable',
+    component: SetTableView
   }
 ]
 

@@ -30,7 +30,8 @@ export default {
     config: '数据源配置',
     export: '数据字典导出',
     diff: '版本对比',
-    generate: '全量DDL脚本生成'
+    generate: '全量DDL脚本生成',
+    settable: '套表处理'
   },
   config: {
     title: '数据源配置',
@@ -142,7 +143,7 @@ export default {
     noScript: '请先生成脚本'
   },
   footer: {
-    copyright: 'SchemaSync v1.0.2 © 2026',
+    copyright: 'SchemaSync v1.0.3 © 2026',
     poweredBy: '基于 Spring Boot + Vue 3'
   }
 }

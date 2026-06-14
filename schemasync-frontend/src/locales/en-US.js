@@ -30,7 +30,8 @@ export default {
     config: 'Data Source Config',
     export: 'Export Dictionary',
     diff: 'Version Diff',
-    generate: 'Generate DDL'
+    generate: 'Generate DDL',
+    settable: 'Set Table'
   },
   config: {
     title: 'Data Source Configuration',
@@ -142,7 +143,7 @@ export default {
     noScript: 'Please generate script first'
   },
   footer: {
-    copyright: 'SchemaSync v1.0.2 © 2026',
+    copyright: 'SchemaSync v1.0.3 © 2026',
     poweredBy: 'Powered by Spring Boot + Vue 3'
   }
 }
