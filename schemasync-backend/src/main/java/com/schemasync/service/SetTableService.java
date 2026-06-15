@@ -248,6 +248,7 @@ public class SetTableService {
             if (!compareColumns.containsKey(entry.getKey())) {
                 allDiffs.add(new DiffRecord(
                         setTablePrefix,
+                        baseName,
                         compareName,
                         entry.getKey(),
                         "字段缺失",
@@ -268,6 +269,7 @@ public class SetTableService {
             if (!baseColumns.containsKey(entry.getKey())) {
                 allDiffs.add(new DiffRecord(
                         setTablePrefix,
+                        baseName,
                         compareName,
                         entry.getKey(),
                         "字段多余",
@@ -293,6 +295,7 @@ public class SetTableService {
                 if (!Objects.equals(baseCol.getDataType(), compareCol.getDataType())) {
                     allDiffs.add(new DiffRecord(
                             setTablePrefix,
+                            baseName,
                             compareName,
                             columnName,
                             "字段类型不一致",
@@ -312,6 +315,7 @@ public class SetTableService {
                 if (!Objects.equals(baseCol.getLength(), compareCol.getLength())) {
                     allDiffs.add(new DiffRecord(
                             setTablePrefix,
+                            baseName,
                             compareName,
                             columnName,
                             "字段长度不一致",
@@ -331,6 +335,7 @@ public class SetTableService {
                 if (!Objects.equals(baseCol.getPrecision(), compareCol.getPrecision())) {
                     allDiffs.add(new DiffRecord(
                             setTablePrefix,
+                            baseName,
                             compareName,
                             columnName,
                             "字段精度不一致",
@@ -354,6 +359,7 @@ public class SetTableService {
      */
     private static class DiffRecord {
         String setTablePrefix;      // 套表前缀
+        String baseTableName;       // 基准表名
         String tableName;           // 表名
         String columnName;          // 字段名
         String diffType;            // 差异类型
@@ -366,13 +372,14 @@ public class SetTableService {
         String comparePrecision;    // 对比表精度
         String details;             // 详情
 
-        public DiffRecord(String setTablePrefix, String tableName, String columnName,
+        public DiffRecord(String setTablePrefix, String baseTableName, String tableName, String columnName,
                          String diffType, String severity,
                          String baseDataType, String compareDataType,
                          String baseLength, String compareLength,
                          String basePrecision, String comparePrecision,
                          String details) {
             this.setTablePrefix = setTablePrefix;
+            this.baseTableName = baseTableName;
             this.tableName = tableName;
             this.columnName = columnName;
             this.diffType = diffType;
@@ -405,7 +412,7 @@ public class SetTableService {
 
             // 创建表头
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"套表前缀", "表名", "字段名", "差异类型", "严重程度",
+            String[] headers = {"套表前缀", "基准表名", "对比表名", "字段名", "差异类型", "严重程度",
                     "基准值(数据类型)", "对比值(数据类型)",
                     "基准值(长度)", "对比值(长度)",
                     "基准值(精度)", "对比值(精度)",
@@ -423,17 +430,18 @@ public class SetTableService {
             for (DiffRecord diff : diffs) {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(diff.setTablePrefix);
-                row.createCell(1).setCellValue(diff.tableName);
-                row.createCell(2).setCellValue(diff.columnName);
-                row.createCell(3).setCellValue(diff.diffType);
-                row.createCell(4).setCellValue(diff.severity);
-                row.createCell(5).setCellValue(diff.baseDataType != null ? diff.baseDataType : "");
-                row.createCell(6).setCellValue(diff.compareDataType != null ? diff.compareDataType : "");
-                row.createCell(7).setCellValue(diff.baseLength != null ? diff.baseLength : "");
-                row.createCell(8).setCellValue(diff.compareLength != null ? diff.compareLength : "");
-                row.createCell(9).setCellValue(diff.basePrecision != null ? diff.basePrecision : "");
-                row.createCell(10).setCellValue(diff.comparePrecision != null ? diff.comparePrecision : "");
-                row.createCell(11).setCellValue(diff.details != null ? diff.details : "");
+                row.createCell(1).setCellValue(diff.baseTableName);
+                row.createCell(2).setCellValue(diff.tableName);
+                row.createCell(3).setCellValue(diff.columnName);
+                row.createCell(4).setCellValue(diff.diffType);
+                row.createCell(5).setCellValue(diff.severity);
+                row.createCell(6).setCellValue(diff.baseDataType != null ? diff.baseDataType : "");
+                row.createCell(7).setCellValue(diff.compareDataType != null ? diff.compareDataType : "");
+                row.createCell(8).setCellValue(diff.baseLength != null ? diff.baseLength : "");
+                row.createCell(9).setCellValue(diff.compareLength != null ? diff.compareLength : "");
+                row.createCell(10).setCellValue(diff.basePrecision != null ? diff.basePrecision : "");
+                row.createCell(11).setCellValue(diff.comparePrecision != null ? diff.comparePrecision : "");
+                row.createCell(12).setCellValue(diff.details != null ? diff.details : "");
             }
 
             // 自动调整列宽
