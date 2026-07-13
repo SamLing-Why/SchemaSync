@@ -33,15 +33,16 @@ public class DiffController {
     public ResponseEntity<byte[]> compareFiles(
             @RequestParam("oldFile") MultipartFile oldFile,
             @RequestParam("newFile") MultipartFile newFile,
-            @RequestParam(defaultValue = "excel") String exportFormat) {
+            @RequestParam(defaultValue = "excel") String exportFormat,
+            @RequestParam(defaultValue = "mysql") String databaseType) {
         
         // 验证文件
         if (oldFile.isEmpty() || newFile.isEmpty()) {
             throw new RuntimeException("请上传两个文件");
         }
 
-        // 执行对比并格式化（内部会传递newDict用于生成DDL）
-        byte[] data = diffService.compareAndFormat(oldFile, newFile, exportFormat);
+        // 执行对比并格式化（传递newDict和databaseType用于生成DDL）
+        byte[] data = diffService.compareAndFormat(oldFile, newFile, exportFormat, databaseType);
 
         // 设置响应头
         HttpHeaders headers = new HttpHeaders();

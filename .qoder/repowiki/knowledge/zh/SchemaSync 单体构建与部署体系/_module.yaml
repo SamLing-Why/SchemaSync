@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: build_system
+title: SchemaSync 单体构建与部署体系
+scope: []
+source_files:
+    - schemasync-backend/pom.xml
+    - build.sh
+    - build.bat
+    - deploy/start.sh
+    - deploy/start.bat
+    - deploy/application.yml
+    - schemasync-frontend/package.json
+    - BUILD.md
+depends_on: []
+related_to: []

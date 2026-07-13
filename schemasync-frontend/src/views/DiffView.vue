@@ -41,6 +41,7 @@
             <el-option label="MySQL" value="mysql" />
             <el-option label="GaussDB (MySQL兼容模式)" value="gaussdb_mysql" />
             <el-option label="GaussDB (Oracle兼容模式)" value="gaussdb_oracle" />
+            <el-option label="GaussDB (PG模式)" value="gaussdb_pg" />
           </el-select>
         </el-form-item>
 
@@ -171,6 +172,7 @@ const downloadDiff = async () => {
     formData.append('oldFile', new Blob([oldFileBuffer.value]), oldFile.value.name)
     formData.append('newFile', new Blob([newFileBuffer.value]), newFile.value.name)
     formData.append('exportFormat', 'excel')  // 固定为Excel
+    formData.append('databaseType', databaseType.value)  // 传递数据库类型
 
     const response = await fetch('/api/diff', {
       method: 'POST',

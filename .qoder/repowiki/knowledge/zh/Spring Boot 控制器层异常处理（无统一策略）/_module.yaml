@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: error_handling
+title: Spring Boot 控制器层异常处理（无统一策略）
+scope: []
+source_files:
+    - schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java
+    - schemasync-backend/src/main/java/com/schemasync/controller/ExportController.java
+    - schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java
+    - schemasync-backend/src/main/java/com/schemasync/config/WebConfig.java
+depends_on: []
+related_to: []

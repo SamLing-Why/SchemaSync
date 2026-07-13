@@ -75,7 +75,7 @@ public class DdlGeneratorService {
      * 从数据字典生成DDL SQL
      * 
      * @param dictionary 数据字典
-     * @param databaseType 数据库类型(mysql/gaussdb_mysql/gaussdb_oracle)
+     * @param databaseType 数据库类型(mysql/gaussdb_mysql/gaussdb_oracle/gaussdb_pg)
      * @return DDL SQL字符串
      */
     public String generateDdlFromDictionary(SchemaDictionary dictionary, String databaseType) {
@@ -90,6 +90,9 @@ public class DdlGeneratorService {
             case "gaussdb_oracle":
                 // GaussDB Oracle兼容模式
                 return generateGaussDbOracleStyleDdl(dictionary);
+            case "gaussdb_pg":
+                // GaussDB PG模式（PostgreSQL标准模式）
+                return generateGaussDbPgStyleDdl(dictionary);
             default:
                 log.warn("不支持的数据库类型: {}, 使用MySQL默认模式", databaseType);
                 return generateMySqlStyleDdl(dictionary);
@@ -713,5 +716,182 @@ public class DdlGeneratorService {
         }
         
         return false;
+    }
+    
+    /**
+     * 生成GaussDB PG模式风格DDL（PostgreSQL标准模式）
+     * GaussDB PG模式遵循PostgreSQL标准SQL语法，兼容性最好
+     */
+    private String generateGaussDbPgStyleDdl(SchemaDictionary dictionary) {
+        StringBuilder sql = new StringBuilder();
+        
+        // 1. 添加注释头
+        ExportMetadata metadata = dictionary.getMetadata();
+        sql.append("-- ============================================\n");
+        sql.append("-- SchemaSync DDL Generation Script\n");
+        sql.append("-- 数据库类型: GaussDB (PG模式)\n");
+        if (metadata != null) {
+            sql.append("-- 数据库: ").append(metadata.getDatabaseName()).append("\n");
+            sql.append("-- 版本: ").append(metadata.getDatabaseVersion()).append("\n");
+            sql.append("-- 生成时间: ").append(new Date()).append("\n");
+        }
+        sql.append("-- ============================================\n\n");
+        
+        // 2. 遍历每个表生成DDL
+        if (dictionary.getTables() != null) {
+            for (TableDefinition table : dictionary.getTables()) {
+                // 区分表和视图
+                if ("VIEW".equalsIgnoreCase(table.getTableType())) {
+                    sql.append(generatePgCreateView(table)).append("\n\n");
+                } else {
+                    sql.append(generatePgCreateTable(table)).append("\n\n");
+                }
+            }
+        }
+        
+        log.info("GaussDB PG模式DDL脚本生成完成, 共{}个表", 
+                dictionary.getTables() != null ? dictionary.getTables().size() : 0);
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成PG模式的CREATE TABLE语句
+     */
+    private String generatePgCreateTable(TableDefinition table) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE TABLE ").append(table.getTableName()).append(" (\n");
+        
+        List<String> columnDefs = new ArrayList<>();
+        if (table.getColumns() != null) {
+            for (ColumnDefinition column : table.getColumns()) {
+                columnDefs.add("  " + generatePgColumnDef(column));
+            }
+        }
+        
+        // 主键约束
+        if (table.getColumns() != null) {
+            List<String> pkColumns = table.getColumns().stream()
+                .filter(c -> c.getIsPrimaryKey() != null && c.getIsPrimaryKey())
+                .map(ColumnDefinition::getEffectiveName)
+                .collect(Collectors.toList());
+            if (!pkColumns.isEmpty()) {
+                columnDefs.add("  PRIMARY KEY (" + String.join(", ", pkColumns) + ")");
+            }
+        }
+        
+        sql.append(String.join(",\n", columnDefs));
+        sql.append("\n);\n");
+        
+        // 表注释
+        if (table.getTableComment() != null && !table.getTableComment().isEmpty()) {
+            sql.append("COMMENT ON TABLE ").append(table.getTableName())
+               .append(" IS '").append(table.getTableComment().replace("'", "''")).append("';\n");
+        }
+        
+        // 字段注释
+        if (table.getColumns() != null) {
+            for (ColumnDefinition column : table.getColumns()) {
+                if (column.getComment() != null && !column.getComment().isEmpty()) {
+                    sql.append("COMMENT ON COLUMN ").append(table.getTableName())
+                       .append(".").append(column.getEffectiveName())
+                       .append(" IS '").append(column.getComment().replace("'", "''")).append("';\n");
+                }
+            }
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成PG模式的字段定义
+     */
+    private String generatePgColumnDef(ColumnDefinition column) {
+        StringBuilder def = new StringBuilder();
+        def.append(column.getEffectiveName()).append(" ");
+        
+        String dataType = column.getDataType();
+        if (dataType != null) {
+            def.append(convertToPgType(dataType));
+        } else {
+            def.append("VARCHAR");
+        }
+        
+        // 长度/精度
+        if (column.getPrecision() != null && column.getScale() != null) {
+            def.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+        } else if (column.getLength() != null && column.getLength() > 0) {
+            def.append("(").append(column.getLength()).append(")");
+        }
+        
+        // NOT NULL约束
+        if (column.getNullable() != null && !column.getNullable()) {
+            def.append(" NOT NULL");
+        }
+        
+        // 默认值
+        if (column.getDefaultValue() != null) {
+            String defaultValue = column.getDefaultValue().toString();
+            if (!defaultValue.toLowerCase().equals("null")) {
+                if (isNumericType(dataType)) {
+                    def.append(" DEFAULT ").append(defaultValue);
+                } else {
+                    def.append(" DEFAULT '").append(defaultValue.replace("'", "''")).append("'");
+                }
+            }
+        }
+        
+        return def.toString();
+    }
+    
+    /**
+     * 将数据类型转换为PG标准类型
+     */
+    private String convertToPgType(String dataType) {
+        if (dataType == null) return "VARCHAR";
+        String upper = dataType.toUpperCase();
+        switch (upper) {
+            case "VARCHAR": case "VARCHAR2": case "NVARCHAR": case "NVARCHAR2":
+                return "VARCHAR";
+            case "TEXT": case "LONGTEXT": case "MEDIUMTEXT": case "TINYTEXT":
+                return "TEXT";
+            case "INT": case "INTEGER": case "TINYINT": case "SMALLINT": case "MEDIUMINT":
+                return "INTEGER";
+            case "BIGINT": return "BIGINT";
+            case "FLOAT": return "REAL";
+            case "DOUBLE": return "DOUBLE PRECISION";
+            case "DECIMAL": case "NUMERIC": case "NUMBER":
+                return "NUMERIC";
+            case "DATETIME": case "TIMESTAMP":
+                return "TIMESTAMP";
+            case "DATE": return "DATE";
+            case "BLOB": case "LONGBLOB": case "MEDIUMBLOB": case "TINYBLOB":
+                return "BYTEA";
+            case "BOOLEAN": case "BOOL": case "BIT":
+                return "BOOLEAN";
+            case "JSON": case "JSONB":
+                return "JSONB";
+            default:
+                return upper;
+        }
+    }
+    
+    /**
+     * 生成PG模式的CREATE VIEW语句
+     */
+    private String generatePgCreateView(TableDefinition table) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE OR REPLACE VIEW ").append(table.getTableName()).append(" AS\n");
+        // 视图定义需要从原始数据中获取，这里简化处理
+        if (table.getColumns() != null && !table.getColumns().isEmpty()) {
+            sql.append("SELECT ");
+            List<String> columns = new ArrayList<>();
+            for (ColumnDefinition col : table.getColumns()) {
+                columns.add(col.getEffectiveName());
+            }
+            sql.append(String.join(", ", columns));
+            sql.append(" FROM ...; -- 请补充完整的视图定义");
+        }
+        return sql.toString();
     }
 }

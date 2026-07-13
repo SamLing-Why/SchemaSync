@@ -25,6 +25,7 @@
             <el-option label="MySQL" value="mysql" />
             <el-option label="GaussDB (MySQL兼容模式)" value="gaussdb_mysql" />
             <el-option label="GaussDB (Oracle兼容模式)" value="gaussdb_oracle" />
+            <el-option label="GaussDB (PG模式)" value="gaussdb_pg" />
           </el-select>
         </el-form-item>
 

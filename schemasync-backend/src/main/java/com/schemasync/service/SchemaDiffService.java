@@ -111,7 +111,7 @@ public class SchemaDiffService {
      * @param format 输出格式
      * @return 格式化后的字节数组
      */
-    public byte[] compareAndFormat(MultipartFile oldFile, MultipartFile newFile, String format) {
+    public byte[] compareAndFormat(MultipartFile oldFile, MultipartFile newFile, String format, String databaseType) {
         try {
             log.info("开始对比文件并格式化: {} vs {}", oldFile.getOriginalFilename(), newFile.getOriginalFilename());
 
@@ -129,8 +129,8 @@ public class SchemaDiffService {
             SchemaDiff diff = schemaDiffer.compare(oldDict, newDict);
             log.info("对比完成, 发现{}处变更", diff.getChanges().size());
             
-            // 4. 格式化结果（传递newDict用于生成DDL）
-            byte[] data = formatDiff(diff, format, newDict);
+            // 4. 格式化结果（传递newDict和databaseType用于生成DDL）
+            byte[] data = formatDiff(diff, format, newDict, databaseType);
             
             log.info("格式化完成, 输出格式: {}, 大小: {} bytes", format, data.length);
             return data;
@@ -158,21 +158,16 @@ public class SchemaDiffService {
      * 格式化差异结果为指定格式
      */
     public byte[] formatDiff(SchemaDiff diff, String format) {
-        if ("excel".equalsIgnoreCase(format)) {
-            // 使用简单表格格式导出差异列表
-            return exportDiffAsSimpleExcel(diff, null);
-        } else {
-            return jsonFormatter.formatDiff(diff);
-        }
+        return formatDiff(diff, format, null, "mysql");
     }
     
     /**
-     * 格式化差异结果为指定格式（带新字典）
+     * 格式化差异结果为指定格式（带新字典和数据库类型）
      */
-    public byte[] formatDiff(SchemaDiff diff, String format, SchemaDictionary newDict) {
+    public byte[] formatDiff(SchemaDiff diff, String format, SchemaDictionary newDict, String databaseType) {
         if ("excel".equalsIgnoreCase(format)) {
             // 使用简单表格格式导出差异列表
-            return exportDiffAsSimpleExcel(diff, newDict);
+            return exportDiffAsSimpleExcel(diff, newDict, databaseType);
         } else {
             return jsonFormatter.formatDiff(diff);
         }
@@ -250,6 +245,9 @@ public class SchemaDiffService {
             case "gaussdb_oracle":
                 dbTypeLabel = "GaussDB (Oracle兼容模式)";
                 break;
+            case "gaussdb_pg":
+                dbTypeLabel = "GaussDB (PG模式)";
+                break;
             default:
                 dbTypeLabel = "MySQL";
                 break;
@@ -272,6 +270,8 @@ public class SchemaDiffService {
                 return generateMySqlStyleDiffDdl(sql, newDict, diff);
             case "gaussdb_oracle":
                 return generateGaussDbOracleStyleDiffDdl(sql, newDict, diff);
+            case "gaussdb_pg":
+                return generateGaussDbPgStyleDiffDdl(sql, newDict, diff);
             default:
                 return generateMySqlStyleDiffDdl(sql, newDict, diff);
         }
@@ -294,6 +294,8 @@ public class SchemaDiffService {
                 return generateMySqlStyleDdlForChange(change, newTable);
             case "gaussdb_oracle":
                 return generateGaussDbOracleDdlForChange(change, newTable);
+            case "gaussdb_pg":
+                return generateGaussDbPgDdlForChange(change, newTable);
             default:
                 return generateMySqlStyleDdlForChange(change, newTable);
         }
@@ -879,7 +881,7 @@ public class SchemaDiffService {
     /**
      * 导出差异为简单Excel格式
      */
-    private byte[] exportDiffAsSimpleExcel(SchemaDiff diff, SchemaDictionary newDict) {
+    private byte[] exportDiffAsSimpleExcel(SchemaDiff diff, SchemaDictionary newDict, String databaseType) {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("差异列表");
             
@@ -944,9 +946,9 @@ public class SchemaDiffService {
                     // 详情列（列16）
                     row.createCell(16).setCellValue(formatChangeDetails(change.getDetails()));
                     
-                    // DDL列（列17）- 使用统一的DDL生成方法
+                    // DDL列（列17）- 使用统一的DDL生成方法，根据数据库类型生成对应风格的DDL
                     TableDefinition tableDef = newDict != null ? findTableByName(newDict, change.getTableName()) : null;
-                    String ddl = generateDdlForSingleChange(change, tableDef, "mysql");
+                    String ddl = generateDdlForSingleChange(change, tableDef, databaseType);
                     row.createCell(17).setCellValue(ddl);
                 }
             }
@@ -1220,5 +1222,320 @@ public class SchemaDiffService {
         }
         
         return false;
+    }
+    
+    /**
+     * 生成GaussDB PG风格的差异化DDL
+     */
+    private String generateGaussDbPgStyleDiffDdl(StringBuilder sql, SchemaDictionary newDict, SchemaDiff diff) {
+        Map<String, List<SchemaChange>> changesByTable = diff.getChanges().stream()
+            .collect(Collectors.groupingBy(SchemaChange::getTableName));
+        
+        for (Map.Entry<String, List<SchemaChange>> entry : changesByTable.entrySet()) {
+            String tableName = entry.getKey();
+            List<SchemaChange> tableChanges = entry.getValue();
+            TableDefinition newTable = findTableByName(newDict, tableName);
+            
+            for (SchemaChange change : tableChanges) {
+                com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
+                if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
+                    sql.append("-- 变更类型: 新增表\n");
+                    if (newTable != null && !"VIEW".equalsIgnoreCase(newTable.getTableType())) {
+                        sql.append(generateGaussDbPgCreateTableForDiff(newTable));
+                    }
+                    sql.append("\n\n");
+                } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
+                    sql.append("-- 变更类型: 新增字段\n");
+                    if (newTable != null && change.getColumnName() != null) {
+                        ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                        if (newColumn != null) {
+                            sql.append(generateGaussDbPgAddColumnSql(tableName, newColumn));
+                        }
+                    }
+                    sql.append("\n");
+                } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
+                    sql.append("-- 变更类型: 修改字段\n");
+                    if (newTable != null && change.getColumnName() != null) {
+                        ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                        if (newColumn != null) {
+                            sql.append(generateGaussDbPgModifyColumnSql(tableName, newColumn));
+                        }
+                    }
+                    sql.append("\n");
+                }
+            }
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成GaussDB PG风格的单条DDL
+     */
+    private String generateGaussDbPgDdlForChange(SchemaChange change, TableDefinition newTable) {
+        String tableName = change.getTableName();
+        com.schemasync.model.diff.ChangeType changeType = change.getChangeType();
+        
+        if (changeType == com.schemasync.model.diff.ChangeType.TABLE_ADD) {
+            if (newTable != null && !"VIEW".equalsIgnoreCase(newTable.getTableType())) {
+                return generateGaussDbPgCreateTableForDiff(newTable).trim();
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.TABLE_DROP) {
+            return "-- DROP TABLE " + tableName + "; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_ADD) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateGaussDbPgAddColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_DROP) {
+            if (change.getColumnName() != null) {
+                return "-- ALTER TABLE " + tableName + " DROP COLUMN " + change.getColumnName() + "; -- 已注释，请确认后手动执行";
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.COLUMN_MODIFY) {
+            if (newTable != null && change.getColumnName() != null) {
+                ColumnDefinition newColumn = findColumnByName(newTable, change.getColumnName());
+                if (newColumn != null) {
+                    return generateGaussDbPgModifyColumnSql(tableName, newColumn).trim();
+                }
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_ADD) {
+            // 新增索引（PG风格）
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return generateGaussDbPgCreateIndexSql(tableName, index).trim();
+            }
+            return "";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_DROP) {
+            // 删除索引（PG风格）
+            if (change.getDetails() instanceof com.schemasync.model.dict.IndexDefinition) {
+                com.schemasync.model.dict.IndexDefinition index = (com.schemasync.model.dict.IndexDefinition) change.getDetails();
+                return ("DROP INDEX " + index.getIndexName() + ";").trim();
+            }
+            return "-- DROP INDEX ...; -- 已注释，请确认后手动执行";
+        } else if (changeType == com.schemasync.model.diff.ChangeType.INDEX_MODIFY) {
+            // 修改索引：先删除旧索引，再创建新索引（PG风格）
+            if (change.getDetails() instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> details = (Map<String, Object>) change.getDetails();
+                String indexName = (String) details.get("indexName");
+                Object newValue = details.get("newValue");
+                
+                StringBuilder ddl = new StringBuilder();
+                ddl.append("-- 修改索引: 先删除旧索引，再创建新索引\n");
+                ddl.append("DROP INDEX " + indexName + ";");
+                
+                if (newValue instanceof com.schemasync.model.dict.IndexDefinition) {
+                    com.schemasync.model.dict.IndexDefinition newIndex = (com.schemasync.model.dict.IndexDefinition) newValue;
+                    ddl.append("\n").append(generateGaussDbPgCreateIndexSql(tableName, newIndex).trim());
+                }
+                return ddl.toString().trim();
+            }
+            return "-- 修改索引: " + tableName + " -- 请手动处理";
+        }
+        
+        return "";
+    }
+    
+    /**
+     * 生成GaussDB PG风格的CREATE TABLE（用于差异化DDL）
+     */
+    private String generateGaussDbPgCreateTableForDiff(TableDefinition table) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE TABLE ").append(table.getTableName()).append(" (\n");
+        
+        List<String> columnDefs = new ArrayList<>();
+        if (table.getColumns() != null) {
+            for (ColumnDefinition column : table.getColumns()) {
+                columnDefs.add("  " + generateGaussDbPgColumnDefForDiff(column));
+            }
+        }
+        
+        if (table.getColumns() != null) {
+            List<String> pkColumns = table.getColumns().stream()
+                .filter(c -> c.getIsPrimaryKey() != null && c.getIsPrimaryKey())
+                .map(ColumnDefinition::getEffectiveName)
+                .collect(Collectors.toList());
+            if (!pkColumns.isEmpty()) {
+                columnDefs.add("  PRIMARY KEY (" + String.join(", ", pkColumns) + ")");
+            }
+        }
+        
+        sql.append(String.join(",\n", columnDefs));
+        sql.append("\n);\n");
+        
+        // 表注释
+        if (table.getTableComment() != null && !table.getTableComment().isEmpty()) {
+            sql.append("COMMENT ON TABLE ").append(table.getTableName())
+               .append(" IS '").append(table.getTableComment().replace("'", "''")).append("';\n");
+        }
+        
+        // 字段注释
+        if (table.getColumns() != null) {
+            for (ColumnDefinition column : table.getColumns()) {
+                if (column.getComment() != null && !column.getComment().isEmpty()) {
+                    sql.append("COMMENT ON COLUMN ").append(table.getTableName())
+                       .append(".").append(column.getEffectiveName())
+                       .append(" IS '").append(column.getComment().replace("'", "''")).append("';\n");
+                }
+            }
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成GaussDB PG风格的字段定义（用于差异化DDL）
+     */
+    private String generateGaussDbPgColumnDefForDiff(ColumnDefinition column) {
+        StringBuilder def = new StringBuilder();
+        def.append(column.getEffectiveName()).append(" ");
+        
+        String dataType = column.getDataType();
+        if (dataType != null) {
+            def.append(convertToPgTypeForDiff(dataType));
+        } else {
+            def.append("VARCHAR");
+        }
+        
+        if (column.getPrecision() != null && column.getScale() != null) {
+            def.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+        } else if (column.getLength() != null && column.getLength() > 0) {
+            def.append("(").append(column.getLength()).append(")");
+        }
+        
+        if (column.getNullable() != null && !column.getNullable()) {
+            def.append(" NOT NULL");
+        }
+        
+        if (column.getDefaultValue() != null) {
+            String defaultValue = column.getDefaultValue().toString();
+            if (!defaultValue.toLowerCase().equals("null")) {
+                if (isNumericTypeForDiff(dataType)) {
+                    def.append(" DEFAULT ").append(defaultValue);
+                } else {
+                    def.append(" DEFAULT '").append(defaultValue.replace("'", "''")).append("'");
+                }
+            }
+        }
+        
+        return def.toString();
+    }
+    
+    /**
+     * GaussDB PG风格：新增字段
+     */
+    private String generateGaussDbPgAddColumnSql(String tableName, ColumnDefinition column) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE ").append(tableName).append(" ADD COLUMN ");
+        sql.append(generateGaussDbPgColumnDefForDiff(column));
+        sql.append(";\n");
+        
+        // 字段注释
+        if (column.getComment() != null && !column.getComment().isEmpty()) {
+            sql.append("COMMENT ON COLUMN ").append(tableName)
+               .append(".").append(column.getEffectiveName())
+               .append(" IS '").append(column.getComment().replace("'", "''")).append("';\n");
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * GaussDB PG风格：修改字段
+     * PG模式下修改字段需要分开处理类型、约束和注释
+     */
+    private String generateGaussDbPgModifyColumnSql(String tableName, ColumnDefinition column) {
+        StringBuilder sql = new StringBuilder();
+        
+        // 修改数据类型
+        sql.append("ALTER TABLE ").append(tableName).append(" ALTER COLUMN ")
+           .append(column.getEffectiveName()).append(" TYPE ");
+        
+        String dataType = column.getDataType();
+        if (dataType != null) {
+            sql.append(convertToPgTypeForDiff(dataType));
+        } else {
+            sql.append("VARCHAR");
+        }
+        
+        if (column.getPrecision() != null && column.getScale() != null) {
+            sql.append("(").append(column.getPrecision()).append(",").append(column.getScale()).append(")");
+        } else if (column.getLength() != null && column.getLength() > 0) {
+            sql.append("(").append(column.getLength()).append(")");
+        }
+        sql.append(";\n");
+        
+        // 修改NOT NULL约束
+        if (column.getNullable() != null) {
+            if (!column.getNullable()) {
+                sql.append("ALTER TABLE ").append(tableName).append(" ALTER COLUMN ")
+                   .append(column.getEffectiveName()).append(" SET NOT NULL;\n");
+            } else {
+                sql.append("ALTER TABLE ").append(tableName).append(" ALTER COLUMN ")
+                   .append(column.getEffectiveName()).append(" DROP NOT NULL;\n");
+            }
+        }
+        
+        // 修改注释
+        if (column.getComment() != null && !column.getComment().isEmpty()) {
+            sql.append("COMMENT ON COLUMN ").append(tableName)
+               .append(".").append(column.getEffectiveName())
+               .append(" IS '").append(column.getComment().replace("'", "''")).append("';\n");
+        }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 将数据类型转换为PG标准类型（用于差异化DDL）
+     */
+    private String convertToPgTypeForDiff(String dataType) {
+        if (dataType == null) return "VARCHAR";
+        String upper = dataType.toUpperCase();
+        switch (upper) {
+            case "VARCHAR": case "VARCHAR2": case "NVARCHAR": case "NVARCHAR2":
+                return "VARCHAR";
+            case "TEXT": case "LONGTEXT": case "MEDIUMTEXT": case "TINYTEXT":
+                return "TEXT";
+            case "INT": case "INTEGER": case "TINYINT": case "SMALLINT": case "MEDIUMINT":
+                return "INTEGER";
+            case "BIGINT": return "BIGINT";
+            case "FLOAT": return "REAL";
+            case "DOUBLE": return "DOUBLE PRECISION";
+            case "DECIMAL": case "NUMERIC": case "NUMBER":
+                return "NUMERIC";
+            case "DATETIME": case "TIMESTAMP":
+                return "TIMESTAMP";
+            case "DATE": return "DATE";
+            case "BLOB": case "LONGBLOB": case "MEDIUMBLOB": case "TINYBLOB":
+                return "BYTEA";
+            case "BOOLEAN": case "BOOL": case "BIT":
+                return "BOOLEAN";
+            case "JSON": case "JSONB":
+                return "JSONB";
+            default:
+                return upper;
+        }
+    }
+    
+    /**
+     * GaussDB PG风格：创建索引
+     */
+    private String generateGaussDbPgCreateIndexSql(String tableName, com.schemasync.model.dict.IndexDefinition index) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE ");
+        if (index.getIsUnique() != null && index.getIsUnique()) {
+            sql.append("UNIQUE ");
+        }
+        sql.append("INDEX ").append(index.getIndexName());
+        sql.append(" ON ").append(tableName);
+        sql.append(" (").append(index.getColumns()).append(");");
+        return sql.toString();
     }
 }
