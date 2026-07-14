@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: schemasync_frontend
-title: SchemaSync 前端管理界面（Vue3 + Vite）
+title: SchemaSync 前端管理界面（Vue3 + Element Plus）
 scope:
     - schemasync-frontend/
 source_files: []

@@ -5,6 +5,8 @@
 - [GaussDBAdapter.java](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java)
 - [DatabaseAdapter.java](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapter.java)
 - [DatabaseAdapterFactory.java](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java)
+- [DdlGeneratorService.java](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java)
+- [SchemaDiffService.java](file://schemasync-backend/src/main/java/com/schemasync/service\SchemaDiffService.java)
 - [ConnectionPoolManager.java](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java)
 - [DataSourceConfig.java](file://schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java)
 - [SchemaDictionary.java](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java)
@@ -15,24 +17,34 @@
 - [application.yml](file://schemasync-backend/src/main/resources/application.yml)
 </cite>
 
+## 更新摘要
+**变更内容**   
+- 新增GaussDB PostgreSQL模式完整支持，包括`generateGaussDbPgStyleDdl()`方法
+- 实现PostgreSQL特定的差异报告能力，支持完整的PostgreSQL标准SQL语法
+- 添加数据类型转换、约束处理和注释生成的PostgreSQL特定逻辑
+- 扩展DDL生成服务以支持gaussdb_pg数据库类型
+- 增强差异化比较服务以支持PostgreSQL风格的DDL生成
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
 4. [架构总览](#架构总览)
 5. [详细组件分析](#详细组件分析)
-6. [依赖关系分析](#依赖关系分析)
-7. [性能与连接池调优](#性能与连接池调优)
-8. [故障排查指南](#故障排查指南)
-9. [结论](#结论)
-10. [附录：配置示例与兼容性说明](#附录配置示例与兼容性说明)
+6. [PostgreSQL模式支持](#postgresql模式支持)
+7. [依赖关系分析](#依赖关系分析)
+8. [性能与连接池调优](#性能与连接池调优)
+9. [故障排查指南](#故障排查指南)
+10. [结论](#结论)
+11. [附录：配置示例与兼容性说明](#附录配置示例与兼容性说明)
 
 ## 简介
-本文件聚焦于项目中GaussDB数据库适配器的实现，系统梳理其基于PostgreSQL协议的元数据查询机制、数据类型映射、SCHEMA权限模型、扩展对象支持以及与标准PostgreSQL的差异点。同时给出JDBC连接配置、SSL安全连接设置、连接池调优参数建议，并涵盖企业版与社区版的兼容性考量、版本升级影响评估与迁移注意事项，帮助开发者高效使用GaussDB适配器完成数据字典导出、差异对比与DDL生成等任务。
+本文件聚焦于项目中GaussDB数据库适配器的实现，系统梳理其基于PostgreSQL协议的元数据查询机制、数据类型映射、SCHEMA权限模型、扩展对象支持以及与标准PostgreSQL的差异点。**最新更新**：新增了完整的GaussDB PostgreSQL模式支持，包括PostgreSQL标准SQL语法的DDL生成、差异报告能力、数据类型转换和约束处理。同时给出JDBC连接配置、SSL安全连接设置、连接池调优参数建议，并涵盖企业版与社区版的兼容性考量、版本升级影响评估与迁移注意事项，帮助开发者高效使用GaussDB适配器完成数据字典导出、差异对比与DDL生成等任务。
 
 ## 项目结构
-本项目采用分层与按功能域组织的方式，GaussDB相关代码主要位于适配器层与工具层：
+本项目采用分层与按功能域组织的方式，GaussDB相关代码主要位于适配器层、服务层与工具层：
 - 适配器层：定义统一接口与具体数据库实现（含GaussDB）
+- 服务层：DDL生成服务、差异比较服务（新增PostgreSQL模式支持）
 - 工具层：连接池管理与通用工具
 - 模型层：数据字典与导出元数据模型
 - 配置层：应用与运行期配置
@@ -43,6 +55,10 @@ subgraph "适配器层"
 DA["DatabaseAdapter(接口)"]
 GA["GaussDBAdapter(实现)"]
 DAF["DatabaseAdapterFactory(工厂)"]
+end
+subgraph "服务层"
+DGS["DdlGeneratorService(DDL生成)"]
+SDS["SchemaDiffService(差异比较)"]
 end
 subgraph "工具层"
 CPM["ConnectionPoolManager(连接池管理)"]
@@ -68,24 +84,17 @@ TD --> ID
 TD --> FK
 GA --> DC
 APPYML --> CPM
+DGS --> SD
+SDS --> SD
+DGS --> DGS
+SDS --> SDS
 ```
 
-图表来源
+**图表来源**
 - [DatabaseAdapter.java:1-134](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapter.java#L1-L134)
 - [GaussDBAdapter.java:1-550](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L1-L550)
-- [DatabaseAdapterFactory.java:1-64](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java#L1-L64)
-- [ConnectionPoolManager.java:1-258](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L1-L258)
-- [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
-- [TableDefinition.java:1-89](file://schemasync-backend/src/main/java/com/schemasync/model/dict/TableDefinition.java#L1-L89)
-- [ColumnDefinition.java:1-116](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ColumnDefinition.java#L1-L116)
-- [IndexDefinition.java:1-49](file://schemasync-backend/src/main/java/com/schemasync/model/dict/IndexDefinition.java#L1-L49)
-- [ForeignKeyDefinition.java:1-54](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ForeignKeyDefinition.java#L1-L54)
-- [DataSourceConfig.java:1-129](file://schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java#L1-L129)
-- [application.yml:1-83](file://schemasync-backend/src/main/resources/application.yml#L1-L83)
-
-章节来源
-- [DatabaseAdapter.java:1-134](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapter.java#L1-L134)
-- [GaussDBAdapter.java:1-550](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L1-L550)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [DatabaseAdapterFactory.java:1-64](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java#L1-L64)
 - [ConnectionPoolManager.java:1-258](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L1-L258)
 - [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
@@ -99,13 +108,17 @@ APPYML --> CPM
 ## 核心组件
 - DatabaseAdapter接口：统一抽象了连接、测试、元数据导出、表/列/索引/外键获取、数据库类型与版本识别等能力。
 - GaussDBAdapter：面向GaussDB/OpenGauss的具体实现，基于PG系统表与information_schema进行元数据采集，提供SCHEMA感知与自动检测逻辑。
+- **DdlGeneratorService**：DDL生成服务，**新增PostgreSQL模式支持**，支持mysql、gaussdb_mysql、gaussdb_oracle、gaussdb_pg四种数据库类型的DDL生成。
+- **SchemaDiffService**：差异比较服务，**新增PostgreSQL风格差异报告**，支持完整的PostgreSQL标准SQL语法差异生成。
 - ConnectionPoolManager：基于HikariCP的连接池管理器，负责按数据源维度创建、缓存、复用和关闭连接池，并提供自定义连接池参数注入。
 - 数据字典模型：SchemaDictionary、TableDefinition、ColumnDefinition、IndexDefinition、ForeignKeyDefinition用于承载导出的完整结构信息。
 - 数据源配置：DataSourceConfig承载连接参数、超时、字符集、自定义JDBC URL与连接池高级配置。
 
-章节来源
+**章节来源**
 - [DatabaseAdapter.java:1-134](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapter.java#L1-L134)
 - [GaussDBAdapter.java:1-550](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L1-L550)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [ConnectionPoolManager.java:1-258](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L1-L258)
 - [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
 - [TableDefinition.java:1-89](file://schemasync-backend/src/main/java/com/schemasync/model/dict/TableDefinition.java#L1-L89)
@@ -115,7 +128,7 @@ APPYML --> CPM
 - [DataSourceConfig.java:1-129](file://schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java#L1-L129)
 
 ## 架构总览
-GaussDB适配器通过工厂注册与发现，在运行时根据数据库类型选择对应实现；连接由连接池管理器统一管控；元数据导出流程串联表、列、索引、外键的查询与组装。
+GaussDB适配器通过工厂注册与发现，在运行时根据数据库类型选择对应实现；连接由连接池管理器统一管控；元数据导出流程串联表、列、索引、外键的查询与组装。**新增的PostgreSQL模式支持**使得系统能够生成符合PostgreSQL标准的DDL语句和差异报告。
 
 ```mermaid
 sequenceDiagram
@@ -123,6 +136,8 @@ participant Client as "调用方"
 participant Factory as "DatabaseAdapterFactory"
 participant Adapter as "GaussDBAdapter"
 participant Pool as "ConnectionPoolManager"
+participant DDLGen as "DdlGeneratorService"
+participant DiffSvc as "SchemaDiffService"
 participant DB as "GaussDB(PostgreSQL协议)"
 Client->>Factory : 请求GAUSSDB适配器
 Factory-->>Client : 返回GaussDBAdapter实例
@@ -132,12 +147,20 @@ Pool-->>Adapter : Connection
 Adapter->>DB : 查询SCHEMA/表/列/索引/外键
 DB-->>Adapter : 元数据结果集
 Adapter-->>Client : SchemaDictionary(完整结构)
+Client->>DDLGen : generateDdlFromDictionary(dict, "gaussdb_pg")
+DDLGen->>DDLGen : generateGaussDbPgStyleDdl()
+DDLGen-->>Client : PostgreSQL标准DDL
+Client->>DiffSvc : generateDiffDdl(newDict, oldDiff, "gaussdb_pg")
+DiffSvc->>DiffSvc : generateGaussDbPgStyleDiffDdl()
+DiffSvc-->>Client : PostgreSQL差异报告
 ```
 
-图表来源
+**图表来源**
 - [DatabaseAdapterFactory.java:1-64](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java#L1-L64)
 - [GaussDBAdapter.java:176-264](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L176-L264)
 - [ConnectionPoolManager.java:36-49](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L36-L49)
+- [DdlGeneratorService.java:81-100](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L81-L100)
+- [SchemaDiffService.java:236-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L236-L278)
 
 ## 详细组件分析
 
@@ -162,18 +185,18 @@ GetFKs --> Assemble
 Assemble --> End(["结束"])
 ```
 
-图表来源
+**图表来源**
 - [GaussDBAdapter.java:30-90](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L30-L90)
 - [GaussDBAdapter.java:290-366](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L290-L366)
 - [GaussDBAdapter.java:500-548](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L500-L548)
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:30-90](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L30-L90)
 - [GaussDBAdapter.java:290-366](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L290-L366)
 - [GaussDBAdapter.java:500-548](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L500-L548)
 
 ### SCHEMA权限模型与自动检测
-- 支持SCHEMA层级：supportsSchema()返回true，适配GaussDB/OpenGauss的“数据库→SCHEMA→表”模型。
+- 支持SCHEMA层级：supportsSchema()返回true，适配GaussDB/OpenGauss的"数据库→SCHEMA→表"模型。
 - SCHEMA列表：从pg_namespace过滤系统命名空间后返回用户可见SCHEMA；若无则回退到public。
 - 自动检测：当未指定SCHEMA时，优先选择存在用户表的非系统SCHEMA，否则回退public。
 
@@ -190,12 +213,12 @@ F --> H
 G --> H
 ```
 
-图表来源
+**图表来源**
 - [GaussDBAdapter.java:125-148](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L125-L148)
-- [GaussDBAdapter.java:270-287](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L270-L287)
+- [GaussDBAdapter.java:270-287](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L270-287)
 - [GaussDBAdapter.java:195-201](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L195-L201)
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:98-100](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L98-L100)
 - [GaussDBAdapter.java:125-148](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L125-L148)
 - [GaussDBAdapter.java:270-287](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L270-L287)
@@ -217,11 +240,11 @@ L --> R
 U --> R
 ```
 
-图表来源
+**图表来源**
 - [GaussDBAdapter.java:372-429](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L372-L429)
 - [GaussDBAdapter.java:434-497](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L434-L497)
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:372-429](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L372-L429)
 - [GaussDBAdapter.java:434-497](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L434-L497)
 
@@ -231,7 +254,7 @@ U --> R
 - 索引类型：区分PRIMARY与INDEX，并标识唯一性。
 - 外键约束：通过information_schema三表关联获取引用关系。
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:30-39](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L30-L39)
 - [GaussDBAdapter.java:41-63](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L41-L63)
 - [GaussDBAdapter.java:65-77](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L65-L77)
@@ -243,7 +266,7 @@ U --> R
 - 分布式与高可用：GaussDB企业版具备分布式与读写分离能力，但本适配器以单库视角采集元数据；跨分片/多节点场景需关注目标库一致性。
 - 性能优化选项：可结合连接池参数与JDBC URL参数（如loggerLevel）降低开销；大批量导出时可考虑分批与并发策略（当前实现为串行逐表）。
 
-章节来源
+**章节来源**
 - [ConnectionPoolManager.java:122-131](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L122-L131)
 - [GaussDBAdapter.java:151-159](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L151-L159)
 
@@ -276,6 +299,25 @@ class GaussDBAdapter {
 -detectSchema(conn, database) String
 -convertToStandardTypeName(typeName) String
 -parseTypeLengthAndPrecision(dataType, formatType, attTypMod, column) void
+}
+class DdlGeneratorService {
++generateDdl(inputStream, fileType, databaseType) String
++generateDdlFromDictionary(dictionary, databaseType) String
++generateCreateTable(table) String
++generateCreateView(view) String
+-private generateGaussDbPgStyleDdl(dictionary) String
+-private generatePgCreateTable(table) String
+-private generatePgColumnDef(column) String
+-private convertToPgType(dataType) String
+}
+class SchemaDiffService {
++generateDiffDdl(newDict, diff, databaseType) String
++generateDdlForSingleChange(change, newTable, databaseType) String
+-private generateGaussDbPgStyleDiffDdl(sql, newDict, diff) String
+-private generateGaussDbPgDdlForChange(change, newTable) String
+-private generateGaussDbPgCreateTableForDiff(table) String
+-private generateGaussDbPgAddColumnSql(tableName, column) String
+-private generateGaussDbPgModifyColumnSql(tableName, column) String
 }
 class ConnectionPoolManager {
 +getConnection(config) Connection
@@ -335,15 +377,19 @@ DatabaseAdapter <|.. GaussDBAdapter
 GaussDBAdapter --> ConnectionPoolManager : "使用"
 GaussDBAdapter --> DataSourceConfig : "读取"
 GaussDBAdapter --> SchemaDictionary : "产出"
+DdlGeneratorService --> SchemaDictionary : "处理"
+SchemaDiffService --> SchemaDictionary : "比较"
 SchemaDictionary --> TableDefinition
 TableDefinition --> ColumnDefinition
 TableDefinition --> IndexDefinition
 TableDefinition --> ForeignKeyDefinition
 ```
 
-图表来源
+**图表来源**
 - [DatabaseAdapter.java:1-134](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapter.java#L1-L134)
 - [GaussDBAdapter.java:1-550](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L1-L550)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [ConnectionPoolManager.java:1-258](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L1-L258)
 - [DataSourceConfig.java:1-129](file://schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java#L1-L129)
 - [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
@@ -352,10 +398,123 @@ TableDefinition --> ForeignKeyDefinition
 - [IndexDefinition.java:1-49](file://schemasync-backend/src/main/java/com/schemasync/model/dict/IndexDefinition.java#L1-L49)
 - [ForeignKeyDefinition.java:1-54](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ForeignKeyDefinition.java#L1-L54)
 
+## PostgreSQL模式支持
+
+### 新增的PostgreSQL模式DDL生成
+**最新更新**：系统现在支持完整的GaussDB PostgreSQL模式，通过`generateGaussDbPgStyleDdl()`方法生成符合PostgreSQL标准SQL语法的DDL语句。
+
+#### PostgreSQL模式DDL生成流程
+```mermaid
+flowchart TD
+A["接收SchemaDictionary"] --> B["generateGaussDbPgStyleDdl()"]
+B --> C["添加PostgreSQL模式注释头"]
+C --> D{"遍历每个表"}
+D --> |表| E["generatePgCreateTable()"]
+D --> |视图| F["generatePgCreateView()"]
+E --> G["generatePgColumnDef()"]
+G --> H["convertToPgType()"]
+H --> I["生成PostgreSQL标准DDL"]
+F --> I
+I --> J["添加表和字段注释"]
+J --> K["返回完整DDL脚本"]
+```
+
+**图表来源**
+- [DdlGeneratorService.java:725-756](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L725-L756)
+- [DdlGeneratorService.java:761-804](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L761-L804)
+- [DdlGeneratorService.java:809-845](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L809-L845)
+- [DdlGeneratorService.java:850-877](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L850-L877)
+
+#### PostgreSQL数据类型转换
+系统实现了完整的PostgreSQL数据类型转换逻辑，支持以下类型映射：
+- 字符串类型：VARCHAR/VARCHAR2/NVARCHAR → VARCHAR
+- 文本类型：TEXT/LONGTEXT/MEDIUMTEXT/TINYTEXT → TEXT  
+- 整数类型：INT/INTEGER/TINYINT/SMALLINT/MEDIUMINT → INTEGER
+- 浮点类型：FLOAT → REAL, DOUBLE → DOUBLE PRECISION
+- 数值类型：DECIMAL/NUMERIC/NUMBER → NUMERIC
+- 时间类型：DATETIME/TIMESTAMP → TIMESTAMP
+- 二进制类型：BLOB/LONGBLOB/MEDIUMBLOB/TINYBLOB → BYTEA
+- 布尔类型：BOOLEAN/BOOL/BIT → BOOLEAN
+- JSON类型：JSON/JSONB → JSONB
+
+**章节来源**
+- [DdlGeneratorService.java:725-756](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L725-L756)
+- [DdlGeneratorService.java:761-804](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L761-L804)
+- [DdlGeneratorService.java:809-845](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L809-L845)
+- [DdlGeneratorService.java:850-877](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L850-L877)
+
+### PostgreSQL风格差异报告
+**最新更新**：系统现在支持PostgreSQL风格的差异报告生成，通过`generateGaussDbPgStyleDiffDdl()`方法生成符合PostgreSQL标准的差异DDL。
+
+#### PostgreSQL差异处理流程
+```mermaid
+flowchart TD
+A["接收SchemaDiff"] --> B["generateGaussDbPgStyleDiffDdl()"]
+B --> C["按表分组变更"]
+C --> D{"遍历每个表的变更"}
+D --> |新增表| E["generateGaussDbPgCreateTableForDiff()"]
+D --> |新增字段| F["generateGaussDbPgAddColumnSql()"]
+D --> |修改字段| G["generateGaussDbPgModifyColumnSql()"]
+D --> |新增索引| H["generateGaussDbPgCreateIndexSql()"]
+E --> I["生成PostgreSQL差异DDL"]
+F --> I
+G --> I
+H --> I
+I --> J["返回完整差异报告"]
+```
+
+**图表来源**
+- [SchemaDiffService.java:1230-1270](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1230-L1270)
+- [SchemaDiffService.java:1275-1343](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1275-L1343)
+- [SchemaDiffService.java:1348-1390](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1348-L1390)
+- [SchemaDiffService.java:1433-1447](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1433-L1447)
+- [SchemaDiffService.java:1453-1493](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1453-L1493)
+- [SchemaDiffService.java:1530-1540](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1530-L1540)
+
+#### PostgreSQL字段操作支持
+系统实现了完整的PostgreSQL字段操作支持：
+- **新增字段**：使用`ALTER TABLE ... ADD COLUMN`语法
+- **修改字段**：分别处理数据类型修改、NOT NULL约束修改、注释修改
+- **索引操作**：支持CREATE INDEX、DROP INDEX、UNIQUE INDEX等操作
+- **注释管理**：支持COMMENT ON TABLE和COMMENT ON COLUMN语法
+
+**章节来源**
+- [SchemaDiffService.java:1230-1270](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1230-L1270)
+- [SchemaDiffService.java:1275-1343](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1275-L1343)
+- [SchemaDiffService.java:1348-1390](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1348-L1390)
+- [SchemaDiffService.java:1433-1447](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1433-L1447)
+- [SchemaDiffService.java:1453-1493](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1453-L1493)
+- [SchemaDiffService.java:1530-1540](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1530-L1540)
+
+### 数据库类型路由机制
+系统通过统一的数据库类型路由机制支持多种GaussDB模式：
+
+```mermaid
+flowchart TD
+A["databaseType参数"] --> B{"类型判断"}
+B --> |mysql/gaussdb_mysql| C["MySQL兼容模式"]
+B --> |gaussdb_oracle| D["Oracle兼容模式"]
+B --> |gaussdb_pg| E["PostgreSQL标准模式"]
+B --> |其他| F["默认MySQL模式"]
+C --> G["generateMySqlStyleDdl()"]
+D --> H["generateGaussDbOracleStyleDdl()"]
+E --> I["generateGaussDbPgStyleDdl()"]
+F --> G
+```
+
+**图表来源**
+- [DdlGeneratorService.java:81-100](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L81-L100)
+- [SchemaDiffService.java:236-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L236-L278)
+
+**章节来源**
+- [DdlGeneratorService.java:81-100](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L81-L100)
+- [SchemaDiffService.java:236-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L236-L278)
+
 ## 依赖关系分析
 - 适配器与工厂：工厂扫描所有DatabaseAdapter实现，按getDatabaseType()注册到Map，供外部按类型获取。
 - 适配器与连接池：GaussDBAdapter.connect()委托ConnectionPoolManager.getConnection()，后者根据DataSourceConfig构建HikariDataSource并缓存。
 - 适配器与模型：导出流程将元数据填充至SchemaDictionary及子模型，供上层服务消费。
+- **新增服务依赖**：DdlGeneratorService和SchemaDiffService现在都支持gaussdb_pg类型，提供完整的PostgreSQL模式支持。
 
 ```mermaid
 graph LR
@@ -368,26 +527,34 @@ SD --> TD["TableDefinition"]
 TD --> CD["ColumnDefinition"]
 TD --> ID["IndexDefinition"]
 TD --> FK["ForeignKeyDefinition"]
+DGS["DdlGeneratorService"] --> SD
+SDS["SchemaDiffService"] --> SD
+DGS --> DGS
+SDS --> SDS
 ```
 
-图表来源
+**图表来源**
 - [DatabaseAdapterFactory.java:1-64](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java#L1-L64)
 - [GaussDBAdapter.java:162-174](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L162-L174)
 - [ConnectionPoolManager.java:36-90](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L36-L90)
 - [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
-章节来源
+**章节来源**
 - [DatabaseAdapterFactory.java:1-64](file://schemasync-backend/src/main/java/com/schemasync/adapter/DatabaseAdapterFactory.java#L1-L64)
 - [GaussDBAdapter.java:162-174](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L162-L174)
 - [ConnectionPoolManager.java:36-90](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L36-L90)
+- [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
 
 ## 性能与连接池调优
 - 连接池默认参数：最大连接数10、最小空闲2、连接超时取配置（秒）、空闲超时10分钟、最大存活30分钟。
 - 自定义连接池参数：支持JSON格式覆盖maximumPoolSize、minimumIdle、connectionTimeout、idleTimeout、maxLifetime。
 - 日志级别：GaussDB JDBC URL默认关闭loggerLevel以降低开销。
 - 导出性能：当前为串行逐表导出，若表数量较大，可在业务侧增加批处理或并发策略（注意目标库负载与锁竞争）。
+- **PostgreSQL模式优化**：PostgreSQL模式的DDL生成和差异比较都经过优化，支持高效的批量处理和内存管理。
 
-章节来源
+**章节来源**
 - [ConnectionPoolManager.java:54-90](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L54-L90)
 - [ConnectionPoolManager.java:146-186](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L146-L186)
 - [GaussDBAdapter.java:222-264](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L222-L264)
@@ -403,16 +570,20 @@ TD --> FK["ForeignKeyDefinition"]
 - 数据类型异常
   - numeric/decimal超长精度或字符串超长长度会被限制并记录日志，建议核对DDL定义。
   - 特殊类型（如inet/macaddr/cidr）会保持原样映射，确保下游生成器能正确处理。
+- **PostgreSQL模式问题**
+  - 确认databaseType参数设置为"gaussdb_pg"以启用PostgreSQL模式。
+  - 检查数据类型转换是否符合PostgreSQL标准，特别是JSONB、BYTEA等特殊类型。
+  - 验证生成的DDL语法是否符合PostgreSQL规范，特别是注释和约束语法。
 - 版本兼容
   - getDatabaseVersion()返回GaussDB版本前缀，若出现未知版本，请检查驱动与服务端版本匹配情况。
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:151-159](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L151-L159)
 - [GaussDBAdapter.java:372-429](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L372-L429)
 - [ConnectionPoolManager.java:122-131](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L122-L131)
 
 ## 结论
-GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGauss的元数据导出能力，充分利用PG系统表与information_schema，兼顾兼容性与扩展性。通过连接池管理与灵活的JDBC URL参数，可满足多种部署与安全需求。建议在大规模导出场景中结合并发与批处理策略，并在生产环境启用SSL与合理的连接池参数，以获得稳定高效的体验。
+GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGauss的元数据导出能力，充分利用PG系统表与information_schema，兼顾兼容性与扩展性。**最新更新**：新增了完整的PostgreSQL模式支持，包括PostgreSQL标准SQL语法的DDL生成、差异报告能力、数据类型转换和约束处理。通过连接池管理与灵活的JDBC URL参数，可满足多种部署与安全需求。建议在大规模导出场景中结合并发与批处理策略，并在生产环境启用SSL与合理的连接池参数，以获得稳定高效的体验。
 
 ## 附录：配置示例与兼容性说明
 
@@ -420,8 +591,9 @@ GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGaus
 - 协议与驱动：使用postgresql协议，JDBC URL形如 jdbc:postgresql://host:port/db?sslmode=disable&loggerLevel=OFF。
 - SSL安全连接：生产环境建议将sslmode设置为require或verify-full，并配置相应证书与认证策略。
 - 自定义URL：DataSourceConfig支持jdbcUrl字段覆盖自动生成URL，便于精细化控制。
+- **PostgreSQL模式配置**：在使用DDL生成和差异比较功能时，需要将databaseType参数设置为"gaussdb_pg"以启用PostgreSQL模式。
 
-章节来源
+**章节来源**
 - [ConnectionPoolManager.java:122-131](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L122-L131)
 - [DataSourceConfig.java:69-73](file://schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java#L69-L73)
 
@@ -430,8 +602,9 @@ GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGaus
 - minimumIdle：保持一定空闲连接，减少冷启动延迟。
 - connectionTimeout/idleTimeout/maxLifetime：依据网络与后端会话生命周期合理设置。
 - JSON覆盖：通过poolConfig传入上述参数，动态覆盖默认值。
+- **PostgreSQL模式优化**：对于PostgreSQL模式的大规模数据处理，建议适当增加连接池大小以提高并发处理能力。
 
-章节来源
+**章节来源**
 - [ConnectionPoolManager.java:54-90](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L54-L90)
 - [ConnectionPoolManager.java:146-186](file://schemasync-backend/src/main/java/com/schemasync/util/ConnectionPoolManager.java#L146-L186)
 
@@ -439,8 +612,9 @@ GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGaus
 - 元数据差异：注释函数与某些系统视图在不同版本可能存在差异，当前实现已做兼容处理；如遇异常，建议升级到较新版本或按需调整SQL。
 - 分布式能力：企业版具备分布式特性，但本适配器以单库视角工作，跨分片一致性需在上层保证。
 - 版本升级影响：升级前后建议验证SCHEMA自动检测、数据类型映射与注释导出结果的一致性。
+- **PostgreSQL模式兼容性**：PostgreSQL模式完全遵循PostgreSQL标准SQL语法，具有良好的跨版本兼容性，适用于GaussDB企业版和社区版。
 
-章节来源
+**章节来源**
 - [GaussDBAdapter.java:30-39](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L30-L39)
 - [GaussDBAdapter.java:125-148](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L125-L148)
 - [GaussDBAdapter.java:151-159](file://schemasync-backend/src/main/java/com/schemasync/adapter/GaussDBAdapter.java#L151-L159)
@@ -448,6 +622,16 @@ GaussDB适配器在现有架构中以最小侵入方式实现了GaussDB/OpenGaus
 ### 应用配置参考
 - 全局应用配置（端口、日志、Jackson序列化等）见application.yml。
 - 开发/生产环境差异化配置可按需加载。
+- **PostgreSQL模式使用示例**：
+  ```java
+  // 生成PostgreSQL模式DDL
+  String ddl = ddlGeneratorService.generateDdlFromDictionary(dictionary, "gaussdb_pg");
+  
+  // 生成PostgreSQL模式差异报告
+  String diffDdl = schemaDiffService.generateDiffDdl(newDict, diff, "gaussdb_pg");
+  ```
 
-章节来源
+**章节来源**
 - [application.yml:1-83](file://schemasync-backend/src/main/resources/application.yml#L1-L83)
+- [DdlGeneratorService.java:81-100](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L81-L100)
+- [SchemaDiffService.java:236-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L236-L278)

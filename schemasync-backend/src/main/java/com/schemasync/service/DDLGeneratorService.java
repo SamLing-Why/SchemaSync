@@ -363,16 +363,17 @@ public class DdlGeneratorService {
             }
         }
         
-        // 索引约束（非主键）
+        // 索引约束（非主键）- 在Oracle/GaussDB模式中，索引通常在表外单独创建
         if (table.getIndexes() != null) {
             // 创建字段名映射：旧名 -> 新名
             Map<String, String> columnNameMap = buildColumnNameMap(table.getColumns());
             
             for (IndexDefinition idx : table.getIndexes()) {
-                if (!"PRIMARY".equalsIgnoreCase(idx.getIndexType())) {
-                    // Oracle模式的索引通常在建表后单独创建，这里仅作为注释
-                    columnDefs.add("  -- INDEX: " + idx.getIndexName() + " (" + 
-                        String.join(", ", idx.getColumns()) + ")");
+                // 过滤主键索引
+                if (!"PRIMARY".equalsIgnoreCase(idx.getIndexType()) 
+                    && !"PRIMARY".equalsIgnoreCase(idx.getIndexName())) {
+                    // 在建表语句中添加索引注释提示
+                    columnDefs.add("  -- INDEX: " + idx.getIndexName() + " (将在表外创建)");
                 }
             }
         }
@@ -397,6 +398,18 @@ public class DdlGeneratorService {
         if (table.getTableComment() != null && !table.getTableComment().isEmpty()) {
             sql.append("COMMENT ON TABLE ").append(table.getTableName())
                .append(" IS '").append(table.getTableComment().replace("'", "\\'")).append("';\n");
+        }
+        
+        // 生成CREATE INDEX语句（非主键索引，在表外单独创建）
+        if (table.getIndexes() != null) {
+            Map<String, String> columnNameMap = buildColumnNameMap(table.getColumns());
+            for (IndexDefinition idx : table.getIndexes()) {
+                // 过滤主键索引
+                if (!"PRIMARY".equalsIgnoreCase(idx.getIndexType()) 
+                    && !"PRIMARY".equalsIgnoreCase(idx.getIndexName())) {
+                    sql.append(generateGaussDbOracleCreateIndex(table.getTableName(), idx, columnNameMap));
+                }
+            }
         }
         
         return sql.toString();
@@ -463,6 +476,35 @@ public class DdlGeneratorService {
         }
         
         return "PRIMARY KEY (" + String.join(", ", pkColumns) + ")";
+    }
+    
+    /**
+     * 生成GaussDB Oracle模式的CREATE INDEX语句
+     */
+    private String generateGaussDbOracleCreateIndex(String tableName, IndexDefinition index, Map<String, String> columnNameMap) {
+        StringBuilder sql = new StringBuilder();
+        
+        // 索引类型
+        if ("UNIQUE".equalsIgnoreCase(index.getIndexType())) {
+            sql.append("CREATE UNIQUE INDEX ");
+        } else {
+            sql.append("CREATE INDEX ");
+        }
+        
+        sql.append(index.getIndexName()).append(" ON ").append(tableName).append(" (");
+        
+        // 索引字段（应用字段名映射，Oracle模式字段名大写）
+        List<String> mappedColumns = new ArrayList<>();
+        if (index.getColumns() != null) {
+            for (String colName : index.getColumns()) {
+                String effectiveName = columnNameMap.getOrDefault(colName, colName);
+                mappedColumns.add(effectiveName.toUpperCase());
+            }
+        }
+        
+        sql.append(String.join(", ", mappedColumns)).append(");\n");
+        
+        return sql.toString();
     }
     
     /**
@@ -800,6 +842,18 @@ public class DdlGeneratorService {
             }
         }
         
+        // 生成CREATE INDEX语句（非主键索引，在表外单独创建）
+        if (table.getIndexes() != null) {
+            Map<String, String> columnNameMap = buildColumnNameMap(table.getColumns());
+            for (IndexDefinition idx : table.getIndexes()) {
+                // 过滤主键索引
+                if (!"PRIMARY".equalsIgnoreCase(idx.getIndexType()) 
+                    && !"PRIMARY".equalsIgnoreCase(idx.getIndexName())) {
+                    sql.append(generatePgCreateIndex(table.getTableName(), idx, columnNameMap));
+                }
+            }
+        }
+        
         return sql.toString();
     }
     
@@ -842,6 +896,35 @@ public class DdlGeneratorService {
         }
         
         return def.toString();
+    }
+    
+    /**
+     * 生成PG模式的CREATE INDEX语句
+     */
+    private String generatePgCreateIndex(String tableName, IndexDefinition index, Map<String, String> columnNameMap) {
+        StringBuilder sql = new StringBuilder();
+        
+        // 索引类型
+        if ("UNIQUE".equalsIgnoreCase(index.getIndexType())) {
+            sql.append("CREATE UNIQUE INDEX ");
+        } else {
+            sql.append("CREATE INDEX ");
+        }
+        
+        sql.append(index.getIndexName()).append(" ON ").append(tableName).append(" (");
+        
+        // 索引字段（应用字段名映射）
+        List<String> mappedColumns = new ArrayList<>();
+        if (index.getColumns() != null) {
+            for (String colName : index.getColumns()) {
+                String effectiveName = columnNameMap.getOrDefault(colName, colName);
+                mappedColumns.add(effectiveName);
+            }
+        }
+        
+        sql.append(String.join(", ", mappedColumns)).append(");\n");
+        
+        return sql.toString();
     }
     
     /**

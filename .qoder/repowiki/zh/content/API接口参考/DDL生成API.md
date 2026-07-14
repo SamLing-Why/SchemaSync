@@ -17,7 +17,17 @@
 - [IndexDefinition.java](file://schemasync-backend/src/main/java/com/schemasync/model/dict/IndexDefinition.java)
 - [ForeignKeyDefinition.java](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ForeignKeyDefinition.java)
 - [ExportMetadata.java](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ExportMetadata.java)
+- [GenerateView.vue](file://schemasync-frontend/src/views/GenerateView.vue)
+- [DiffView.vue](file://schemasync-frontend/src/views/DiffView.vue)
 </cite>
+
+## 更新摘要
+**所做更改**   
+- 新增GaussDB PostgreSQL模式支持，databaseType参数现接受'gaussdb_pg'选项
+- 完善PostgreSQL标准SQL语法的DDL生成逻辑
+- 增强差异化DDL生成功能以支持PG模式
+- 更新前端界面以提供PG模式选择选项
+- 扩展数据类型映射以支持PostgreSQL标准类型
 
 ## 目录
 1. [简介](#简介)
@@ -32,13 +42,15 @@
 10. [附录：接口规范与最佳实践](#附录接口规范与最佳实践)
 
 ## 简介
-本文件面向“DDL脚本生成API”的使用者与集成方，系统性说明以下能力：
+本文件面向"DDL脚本生成API"的使用者与集成方，系统性说明以下能力：
 - 变更检测接口的使用方法、输入数据字典格式要求、输出SQL脚本的生成规则
-- 支持的数据库类型（MySQL、GaussDB MySQL兼容模式、GaussDB Oracle兼容模式）及语法差异
+- 支持的数据库类型（MySQL、GaussDB MySQL兼容模式、GaussDB Oracle兼容模式、**GaussDB PostgreSQL模式**）及语法差异
 - 回滚脚本的生成逻辑、事务控制选项与安全保护机制
 - 完整的请求/响应示例（参数、目标数据库类型、脚本格式等）
 - DDL生成的最佳实践（脚本验证、执行顺序、依赖关系处理）
 - 自定义生成器的扩展指南与常见问题解决方案
+
+**更新** 新增对GaussDB PostgreSQL模式的支持，提供符合PostgreSQL标准SQL语法的DDL生成能力。
 
 ## 项目结构
 后端采用分层设计：控制器层暴露HTTP接口；服务层负责解析、对比与生成；模型层定义数据字典与差异对象；格式化器支持JSON/Excel；生成器提供差异化DDL模板。
@@ -50,8 +62,8 @@ C1["DdlController<br/>全量DDL"]
 C2["DiffController<br/>差异DDL/对比"]
 end
 subgraph "服务层"
-S1["DdlGeneratorService<br/>全量DDL生成"]
-S2["SchemaDiffService<br/>对比+差异化DDL"]
+S1["DdlGeneratorService<br/>全量DDL生成<br/>+ GaussDB PG模式"]
+S2["SchemaDiffService<br/>对比+差异化DDL<br/>+ PG模式支持"]
 S3["SchemaDictionaryParser<br/>JSON/Excel解析"]
 F1["JsonFormatter<br/>JSON序列化/反序列化"]
 end
@@ -73,32 +85,22 @@ S1 --> M1
 S2 --> M1
 ```
 
-图表来源
+**图表来源**
 - [DdlController.java:1-106](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L1-L106)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [DdlGeneratorService.java:1-718](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L718)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
-- [DDLGenerator.java:1-35](file://schemasync-backend/src/main/java/com/schemasync/generator/DDLGenerator.java#L1-L35)
-- [MySQLDDLGenerator.java:1-354](file://schemasync-backend/src/main/java/com/schemasync/generator/MySQLDDLGenerator.java#L1-L354)
-- [SchemaDictionaryParser.java:1-330](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L1-L330)
-- [JsonFormatter.java:1-119](file://schemasync-backend/src/main/java/com/schemasync/formatter/JsonFormatter.java#L1-L119)
-- [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
-- [TableDefinition.java:1-89](file://schemasync-backend/src/main/java/com/schemasync/model/dict/TableDefinition.java#L1-L89)
-- [ColumnDefinition.java:1-116](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ColumnDefinition.java#L1-L116)
-- [IndexDefinition.java:1-49](file://schemasync-backend/src/main/java/com/schemasync/model/dict/IndexDefinition.java#L1-49)
-- [ForeignKeyDefinition.java:1-54](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ForeignKeyDefinition.java#L1-54)
-- [ExportMetadata.java:1-59](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ExportMetadata.java#L1-59)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
 章节来源
 - [DdlController.java:1-106](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L1-L106)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [DdlGeneratorService.java:1-718](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L718)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
 ## 核心组件
 - 全量DDL生成
   - 入口：POST /api/ddl/{generate|preview|download}
-  - 输入：MultipartFile(file)、fileType(excel/json)、databaseType(mysql/gaussdb_mysql/gaussdb_oracle)
+  - 输入：MultipartFile(file)、fileType(excel/json)、databaseType(mysql/gaussdb_mysql/gaussdb_oracle/**gaussdb_pg**)
   - 输出：SQL文本或二进制下载
   - 实现：DdlController -> DdlGeneratorService -> SchemaDictionaryParser -> JSON/Excel解析 -> 生成MySQL/GaussDB风格DDL
 
@@ -115,6 +117,8 @@ S2 --> M1
 - 生成选项与回滚
   - GenerationOptions提供是否包含回滚、是否注释破坏性变更、是否使用事务、版本标识等
   - MySQLDDLGenerator.generateRollback提供基础回滚脚本骨架（删除新增表、提示恢复已删表）
+
+**更新** 新增GaussDB PostgreSQL模式的全量和差异化DDL生成支持。
 
 章节来源
 - [DdlController.java:32-104](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L32-L104)
@@ -145,12 +149,19 @@ Parser->>JsonFmt : parse(data)
 end
 Parser-->>GenSvc : SchemaDictionary
 GenSvc->>GenSvc : generateDdlFromDictionary(dict, dbType)
+alt dbType=mysql/gaussdb_mysql
+GenSvc->>GenSvc : generateMySqlStyleDdl()
+else dbType=gaussdb_oracle
+GenSvc->>GenSvc : generateGaussDbOracleStyleDdl()
+else dbType=gaussdb_pg
+GenSvc->>GenSvc : generateGaussDbPgStyleDdl()
+end
 GenSvc-->>DdlCtrl : SQL字符串
 DdlCtrl-->>Client : 返回SQL字节流/预览文本
 Note over Client,DB : 客户端可保存为.sql后在目标库执行
 ```
 
-图表来源
+**图表来源**
 - [DdlController.java:32-60](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L32-L60)
 - [DdlGeneratorService.java:40-97](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L40-L97)
 - [SchemaDictionaryParser.java:35-81](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L35-L81)
@@ -166,11 +177,13 @@ Note over Client,DB : 客户端可保存为.sql后在目标库执行
 - 参数
   - file：MultipartFile，支持excel或json
   - fileType：excel|json（默认excel）
-  - databaseType：mysql|gaussdb_mysql|gaussdb_oracle（默认mysql）
+  - databaseType：mysql|gaussdb_mysql|gaussdb_oracle|**gaussdb_pg**（默认mysql）
 - 行为
   - 根据fileType选择解析路径
-  - 根据databaseType选择MySQL或GaussDB Oracle风格生成策略
+  - 根据databaseType选择MySQL、GaussDB Oracle或**GaussDB PG**风格生成策略
   - 返回UTF-8编码的SQL内容
+
+**更新** 新增gaussdb_pg选项，支持PostgreSQL标准SQL语法的DDL生成。
 
 章节来源
 - [DdlController.java:32-104](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L32-L104)
@@ -181,10 +194,13 @@ Note over Client,DB : 客户端可保存为.sql后在目标库执行
   - 基于旧版与新版数据字典的差异，生成最小化变更DDL
 - 参数
   - oldFile/newFile：两个版本的字典文件（JSON或Excel）
-  - databaseType：mysql|gaussdb_mysql|gaussdb_oracle（默认mysql）
+  - databaseType：mysql|gaussdb_mysql|gaussdb_oracle|**gaussdb_pg**（默认mysql）
 - 行为
   - 解析两版字典 -> 执行对比 -> 按数据库类型生成差异化DDL
   - 对破坏性变更（如DROP）默认以注释形式提示，避免误执行
+  - **新增**：支持GaussDB PG模式的差异化DDL生成
+
+**更新** 新增对GaussDB PostgreSQL模式的差异化DDL生成支持。
 
 章节来源
 - [DiffController.java:78-106](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L78-L106)
@@ -266,13 +282,13 @@ TableDefinition --> IndexDefinition : "包含"
 TableDefinition --> ForeignKeyDefinition : "包含"
 ```
 
-图表来源
+**图表来源**
 - [SchemaDictionary.java:1-28](file://schemasync-backend/src/main/java/com/schemasync/model/dict/SchemaDictionary.java#L1-L28)
 - [TableDefinition.java:1-89](file://schemasync-backend/src/main/java/com/schemasync/model/dict/TableDefinition.java#L1-L89)
 - [ColumnDefinition.java:1-116](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ColumnDefinition.java#L1-L116)
 - [IndexDefinition.java:1-49](file://schemasync-backend/src/main/java/com/schemasync/model/dict/IndexDefinition.java#L1-49)
 - [ForeignKeyDefinition.java:1-54](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ForeignKeyDefinition.java#L1-54)
-- [ExportMetadata.java:1-59](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ExportMetadata.java#L1-59)
+- [ExportMetadata.java:1-59](file://schemasync-backend/src/main/java/com/schemasync/model/dict/ExportMetadata.java#L1-L59)
 
 章节来源
 - [SchemaDictionaryParser.java:42-81](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L42-L81)
@@ -290,12 +306,22 @@ TableDefinition --> ForeignKeyDefinition : "包含"
   - 索引通常单独创建（DDL中作为注释提示）
   - ON UPDATE CASCADE不支持，会标注需要手动处理
   - 表注释使用COMMENT ON TABLE语句
+- **GaussDB PostgreSQL模式（新增）**
+  - 遵循PostgreSQL标准SQL语法，兼容性最好
+  - 标识符不使用引号包裹，保持原始大小写
+  - 类型转换：VARCHAR/VARCHAR2/NVARCHAR->VARCHAR、TEXT/LONGTEXT/MEDIUMTEXT/TINYTEXT->TEXT、INT/INTEGER/TINYINT/SMALLINT/MEDIUMINT->INTEGER、BIGINT->BIGINT、FLOAT->REAL、DOUBLE->DOUBLE PRECISION、DECIMAL/NUMERIC/NUMBER->NUMERIC、DATETIME/TIMESTAMP->TIMESTAMP、DATE->DATE、BLOB/LONGBLOB/MEDIUMBLOB/TINYBLOB->BYTEA、BOOLEAN/BOOL/BIT->BOOLEAN、JSON/JSONB->JSONB
+  - 表注释和字段注释使用独立的COMMENT ON语句
+  - 支持标准的PRIMARY KEY、NOT NULL、DEFAULT约束语法
+  - 索引使用CREATE INDEX语句单独创建
+
+**更新** 新增GaussDB PostgreSQL模式的完整DDL生成规则和类型映射支持。
 
 章节来源
 - [DdlGeneratorService.java:109-177](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L109-L177)
 - [DdlGeneratorService.java:342-400](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L342-L400)
 - [DdlGeneratorService.java:405-446](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L405-L446)
-- [DdlGeneratorService.java:514-572](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L514-L572)
+- [DdlGeneratorService.java:514-572](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L514-572)
+- [DdlGeneratorService.java:721-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L721-898)
 
 ### 回滚脚本与事务控制
 - 事务控制
@@ -321,15 +347,20 @@ ParseNew --> Compare["执行对比(SchemaDiffer)"]
 Compare --> Branch{"数据库类型?"}
 Branch --> |mysql/gaussdb_mysql| GenMySql["生成MySQL风格差异化DDL"]
 Branch --> |gaussdb_oracle| GenOracle["生成GaussDB Oracle风格差异化DDL"]
+Branch --> |gaussdb_pg| GenPg["生成GaussDB PG风格差异化DDL"]
 GenMySql --> End(["结束"])
 GenOracle --> End
+GenPg --> End
 ```
 
-图表来源
+**图表来源**
 - [SchemaDiffService.java:203-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L203-L278)
+
+**更新** 新增GaussDB PG模式的差异化DDL生成分支。
 
 章节来源
 - [SchemaDiffService.java:203-278](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L203-L278)
+- [SchemaDiffService.java:1227-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1227-L1542)
 
 ## 依赖关系分析
 - 控制器依赖服务层
@@ -348,11 +379,11 @@ DiffSvc --> GenIF["DDLGenerator(接口)"]
 GenIF --> MyGen["MySQLDDLGenerator"]
 ```
 
-图表来源
+**图表来源**
 - [DdlController.java:1-106](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L1-L106)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [DdlGeneratorService.java:1-718](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L718)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [DdlGeneratorService.java:1-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L1-L898)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [DDLGenerator.java:1-35](file://schemasync-backend/src/main/java/com/schemasync/generator/DDLGenerator.java#L1-L35)
 - [MySQLDDLGenerator.java:1-354](file://schemasync-backend/src/main/java/com/schemasync/generator/MySQLDDLGenerator.java#L1-L354)
 - [SchemaDictionaryParser.java:1-330](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L1-L330)
@@ -395,7 +426,7 @@ GenIF --> MyGen["MySQLDDLGenerator"]
 - [DdlGeneratorService.java:57-61](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L57-L61)
 
 ## 结论
-本API提供从数据字典到DDL的全链路能力，覆盖全量与差异化生成、多数据库方言、回滚与事务控制、以及安全保护机制。通过清晰的模型与分层架构，既满足快速落地，也便于后续扩展更多数据库类型与生成策略。
+本API提供从数据字典到DDL的全链路能力，覆盖全量与差异化生成、多数据库方言、回滚与事务控制、以及安全保护机制。**新增的GaussDB PostgreSQL模式支持**进一步增强了系统的兼容性和实用性。通过清晰的模型与分层架构，既满足快速落地，也便于后续扩展更多数据库类型与生成策略。
 
 [本节为总结性内容，不直接分析具体文件]
 
@@ -404,7 +435,7 @@ GenIF --> MyGen["MySQLDDLGenerator"]
 ### 接口清单与参数
 - 全量DDL
   - POST /api/ddl/generate
-    - 表单参数：file(MultipartFile), fileType(String, excel|json), databaseType(String, mysql|gaussdb_mysql|gaussdb_oracle)
+    - 表单参数：file(MultipartFile), fileType(String, excel|json), databaseType(String, mysql|gaussdb_mysql|gaussdb_oracle|**gaussdb_pg**)
     - 响应：application/octet-stream，文件名ddl_时间戳_毫秒.sql
   - POST /api/ddl/preview
     - 同上参数
@@ -414,8 +445,10 @@ GenIF --> MyGen["MySQLDDLGenerator"]
     - 响应：application/octet-stream，文件名ddl_时间戳_毫秒.sql
 - 差异DDL
   - POST /api/diff/ddl
-    - 表单参数：oldFile(MultipartFile), newFile(MultipartFile), databaseType(String, mysql|gaussdb_mysql|gaussdb_oracle)
+    - 表单参数：oldFile(MultipartFile), newFile(MultipartFile), databaseType(String, mysql|gaussdb_mysql|gaussdb_oracle|**gaussdb_pg**)
     - 响应：application/octet-stream，文件名ddl_时间戳_毫秒.sql
+
+**更新** 新增gaussdb_pg数据库类型选项支持。
 
 章节来源
 - [DdlController.java:32-104](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L32-L104)
@@ -428,7 +461,7 @@ GenIF --> MyGen["MySQLDDLGenerator"]
   - ColumnDefinition支持newColumnName实现字段重命名
 - Excel
   - 必须包含以下Sheet：概述信息、表级别信息、字段级别信息、索引信息、约束信息
-  - 字段级别信息第11列可为“字段名称(新)”以支持重命名
+  - 字段级别信息第11列可为"字段名称(新)"以支持重命名
   - 约束信息目前仅解析FK，且本端字段推断待完善
 
 章节来源
@@ -448,11 +481,20 @@ GenIF --> MyGen["MySQLDDLGenerator"]
   - 按变更类型生成最小化ALTER/CREATE/DROP语句
   - 破坏性变更默认注释提示，需手动确认
   - 索引/外键变更遵循先删后建的顺序
+- **GaussDB PostgreSQL模式特殊规则**
+  - 使用PostgreSQL标准SQL语法
+  - 表注释和字段注释使用独立的COMMENT ON语句
+  - 数据类型转换为PostgreSQL标准类型
+  - 支持标准的约束语法和索引创建方式
+
+**更新** 新增GaussDB PostgreSQL模式的特殊生成规则。
 
 章节来源
 - [DdlGeneratorService.java:109-177](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L109-L177)
 - [DdlGeneratorService.java:182-243](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L182-L243)
+- [DdlGeneratorService.java:721-898](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L721-898)
 - [SchemaDiffService.java:457-501](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L457-L501)
+- [SchemaDiffService.java:1227-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1227-L1542)
 
 ### 事务控制与回滚
 - 事务
@@ -468,11 +510,13 @@ GenIF --> MyGen["MySQLDDLGenerator"]
 
 ### 请求/响应示例（文字描述）
 - 全量DDL生成
-  - 请求：multipart/form-data，file=xxx.xlsx，fileType=excel，databaseType=gaussdb_oracle
+  - 请求：multipart/form-data，file=xxx.xlsx，fileType=excel，databaseType=gaussdb_pg
   - 响应：二进制文件，文件名ddl_20260427123456_1714200000000.sql
 - 差异DDL生成
-  - 请求：multipart/form-data，oldFile=old.json，newFile=new.xlsx，databaseType=mysql
+  - 请求：multipart/form-data，oldFile=old.json，newFile=new.xlsx，databaseType=gaussdb_pg
   - 响应：二进制文件，文件名ddl_20260427123456_1714200000000.sql
+
+**更新** 新增GaussDB PG模式的请求/响应示例。
 
 章节来源
 - [DdlController.java:46-56](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java#L46-L56)
@@ -488,6 +532,12 @@ GenIF --> MyGen["MySQLDDLGenerator"]
   - 外键依赖父表，视图依赖底层对象，必要时调整顺序
 - 版本管理
   - 使用sourceVersion/targetVersion标记脚本来源与目标版本
+- **GaussDB PG模式最佳实践**
+  - 确保目标数据库支持PostgreSQL标准SQL语法
+  - 注意数据类型转换的兼容性
+  - 利用PostgreSQL强大的JSON支持和全文搜索功能
+
+**更新** 新增GaussDB PostgreSQL模式的最佳实践建议。
 
 [本节为通用指导，不直接分析具体文件]
 
@@ -502,3 +552,22 @@ GenIF --> MyGen["MySQLDDLGenerator"]
 章节来源
 - [DDLGenerator.java:11-34](file://schemasync-backend/src/main/java/com/schemasync/generator/DDLGenerator.java#L11-L34)
 - [MySQLDDLGenerator.java:25-68](file://schemasync-backend/src/main/java/com/schemasync/generator/MySQLDDLGenerator.java#L25-L68)
+
+### 前端界面支持
+系统前端已完全支持GaussDB PostgreSQL模式的选择和使用：
+
+- **全量DDL生成界面**（GenerateView.vue）
+  - 数据库类型下拉框新增"GaussDB (PG模式)"选项
+  - 支持实时预览生成的PostgreSQL标准DDL脚本
+  - 提供一键下载功能
+
+- **差异对比界面**（DiffView.vue）
+  - 数据库类型选择支持gaussdb_pg选项
+  - 基于差异结果生成PostgreSQL风格的变更脚本
+  - 支持下载差异报告和DDL脚本
+
+**更新** 前端界面已完全适配GaussDB PostgreSQL模式的用户体验。
+
+章节来源
+- [GenerateView.vue:23-30](file://schemasync-frontend/src/views/GenerateView.vue#L23-L30)
+- [DiffView.vue:39-46](file://schemasync-frontend/src/views/DiffView.vue#L39-L46)

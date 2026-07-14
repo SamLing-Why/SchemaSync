@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: schemasync_backend
-title: SchemaSync 后端服务（Spring Boot REST API）
+title: SchemaSync 数据字典管理后端服务
 scope:
     - schemasync-backend/
 source_files: []

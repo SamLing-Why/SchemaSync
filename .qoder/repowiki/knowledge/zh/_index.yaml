@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-07-13T03:27:50Z"
+exported_at: "2026-07-13T06:36:56Z"
 modules:
     "":
-        dir_name: SchemaSync 数据字典管理工具（前后端单体工程）
-        title: SchemaSync 数据字典管理工具（前后端单体工程）
+        dir_name: SchemaSync 数据字典管理工具（前后端聚合工程）
+        title: SchemaSync 数据字典管理工具（前后端聚合工程）
         scope:
             - README.md
             - BUILD.md
@@ -204,8 +204,8 @@ modules:
         depends_on: []
         related_to: []
     schemasync_backend:
-        dir_name: SchemaSync 后端服务（Spring Boot REST API）
-        title: SchemaSync 后端服务（Spring Boot REST API）
+        dir_name: SchemaSync 数据字典管理后端服务
+        title: SchemaSync 数据字典管理后端服务
         scope:
             - schemasync-backend/
         source_files: []
@@ -214,8 +214,8 @@ modules:
         related_to:
             - path: schemasync_frontend
     schemasync_frontend:
-        dir_name: SchemaSync 前端管理界面（Vue3 + Vite）
-        title: SchemaSync 前端管理界面（Vue3 + Vite）
+        dir_name: SchemaSync 前端管理界面（Vue3 + Element Plus）
+        title: SchemaSync 前端管理界面（Vue3 + Element Plus）
         scope:
             - schemasync-frontend/
         source_files: []

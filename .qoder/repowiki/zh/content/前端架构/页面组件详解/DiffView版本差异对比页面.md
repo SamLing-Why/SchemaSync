@@ -3,6 +3,7 @@
 <cite>
 **本文引用的文件列表**
 - [DiffView.vue](file://schemasync-frontend/src/views/DiffView.vue)
+- [GenerateView.vue](file://schemasync-frontend/src/views/GenerateView.vue)
 - [DiffDetail.vue](file://schemasync-frontend/src/components/DiffDetail.vue)
 - [DiffController.java](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java)
 - [SchemaDiffService.java](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java)
@@ -16,6 +17,12 @@
 - [Severity.java](file://schemasync-backend/src/main/java/com/schemasync/model/diff/Severity.java)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 在DiffView组件的数据库类型选择器中新增"GaussDB (PG模式)"选项
+- 完善GaussDB PG模式的DDL生成逻辑，包括完整的PostgreSQL语法支持
+- 扩展数据库类型支持范围，从原有的MySQL、GaussDB MySQL兼容模式、GaussDB Oracle兼容模式扩展到包含PG模式
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -28,12 +35,13 @@
 9. [结论](#结论)
 
 ## 简介
-本文件围绕“DiffView版本差异对比页面”进行系统化文档化，覆盖前端上传与解析、后端对比与导出、可视化展示、子组件复用机制、结果分析与用户体验优化等关键主题。重点说明：
+本文件围绕"DiffView版本差异对比页面"进行系统化文档化，覆盖前端上传与解析、后端对比与导出、可视化展示、子组件复用机制、结果分析与用户体验优化等关键主题。重点说明：
 - 多文件上传（当前实现为两个独立选择器）与后续对比流程
 - JSON/Excel双格式解析与验证
 - 差异类型标识、破坏性变更高亮、按表分组展示
 - DiffDetail子组件的props与事件通信
 - 差异统计、影响范围评估、DDL脚本生成
+- **新增**：GaussDB PG模式支持，提供完整的PostgreSQL方言DDL生成能力
 - 加载进度、错误提示与缓存策略建议
 
 ## 项目结构
@@ -45,6 +53,7 @@
 graph TB
 subgraph "前端"
 DV["DiffView.vue"]
+GV["GenerateView.vue"]
 DD["DiffDetail.vue"]
 end
 subgraph "后端"
@@ -56,6 +65,7 @@ JF["JsonFormatter.java"]
 EF["ExcelFormatter.java"]
 end
 DV --> DC
+GV --> DC
 DC --> SDS
 SDS --> DSD
 SDS --> SDP
@@ -63,44 +73,44 @@ SDS --> JF
 SDS --> EF
 ```
 
-图表来源
-- [DiffView.vue:1-313](file://schemasync-frontend/src/views/DiffView.vue#L1-L313)
+**图表来源**
+- [DiffView.vue:1-315](file://schemasync-frontend/src/views/DiffView.vue#L1-L315)
+- [GenerateView.vue:1-154](file://schemasync-frontend/src/views/GenerateView.vue#L1-L154)
 - [DiffDetail.vue:1-125](file://schemasync-frontend/src/components/DiffDetail.vue#L1-L125)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
-- [DefaultSchemaDiffer.java:1-512](file://schemasync-backend/src/main/java/com/schemasync/differ/DefaultSchemaDiffer.java#L1-L512)
-- [SchemaDictionaryParser.java:1-330](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L1-L330)
-- [JsonFormatter.java:1-119](file://schemasync-backend/src/main/java/com/schemasync/formatter/JsonFormatter.java#L1-L119)
-- [ExcelFormatter.java:1-408](file://schemasync-backend/src/main/java/com/schemasync/formatter/ExcelFormatter.java#L1-L408)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
 章节来源
-- [DiffView.vue:1-313](file://schemasync-frontend/src/views/DiffView.vue#L1-L313)
+- [DiffView.vue:1-315](file://schemasync-frontend/src/views/DiffView.vue#L1-L315)
+- [GenerateView.vue:1-154](file://schemasync-frontend/src/views/GenerateView.vue#L1-L154)
 - [DiffDetail.vue:1-125](file://schemasync-frontend/src/components/DiffDetail.vue#L1-L125)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
 ## 核心组件
 - DiffView.vue：承载上传表单、对比触发、统计展示、下载差异报告与生成DDL脚本
+- GenerateView.vue：全量DDL脚本生成界面，支持多种数据库类型选择
 - DiffDetail.vue：以折叠面板+表格形式按表分组展示差异明细，支持返回事件
 - DiffController.java：对外暴露三个接口：差异导出、差异统计、DDL生成
-- SchemaDiffService.java：串联解析、对比、格式化与DDL生成
+- SchemaDiffService.java：串联解析、对比、格式化与DDL生成，**新增**完整的GaussDB PG模式支持
 - DefaultSchemaDiffer.java：实现表/字段/索引/外键的对比逻辑与严重级别判定
 - SchemaDictionaryParser.java：从Excel反向解析为内部数据模型
 - JsonFormatter.java：JSON序列化/反序列化
 - ExcelFormatter.java：Excel导出（用于数据字典导出，对比导出使用简单表格路径）
 
 章节来源
-- [DiffView.vue:1-313](file://schemasync-frontend/src/views/DiffView.vue#L1-L313)
+- [DiffView.vue:1-315](file://schemasync-frontend/src/views/DiffView.vue#L1-L315)
+- [GenerateView.vue:1-154](file://schemasync-frontend/src/views/GenerateView.vue#L1-L154)
 - [DiffDetail.vue:1-125](file://schemasync-frontend/src/components/DiffDetail.vue#L1-L125)
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [DefaultSchemaDiffer.java:1-512](file://schemasync-backend/src/main/java/com/schemasync/differ/DefaultSchemaDiffer.java#L1-L512)
 - [SchemaDictionaryParser.java:1-330](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L1-L330)
 - [JsonFormatter.java:1-119](file://schemasync-backend/src/main/java/com/schemasync/formatter/JsonFormatter.java#L1-L119)
 - [ExcelFormatter.java:1-408](file://schemasync-backend/src/main/java/com/schemasync/formatter/ExcelFormatter.java#L1-L408)
 
 ## 架构总览
-以下序列图展示了“开始对比”到“返回统计信息”的端到端调用链。
+以下序列图展示了"开始对比"到"返回统计信息"的端到端调用链。
 
 ```mermaid
 sequenceDiagram
@@ -110,7 +120,7 @@ participant C as "DiffController.java"
 participant S as "SchemaDiffService.java"
 participant P as "SchemaDictionaryParser.java"
 participant D as "DefaultSchemaDiffer.java"
-U->>F : 选择旧/新版本文件并点击“开始对比”
+U->>F : 选择旧/新版本文件并点击"开始对比"
 F->>C : POST /api/diff/summary(oldFile,newFile)
 C->>S : compareFiles(oldFile,newFile)
 S->>P : parseFile(oldFile/newFile)
@@ -122,9 +132,9 @@ C-->>F : JSON响应
 F->>F : 渲染统计卡片
 ```
 
-图表来源
-- [DiffView.vue:132-160](file://schemasync-frontend/src/views/DiffView.vue#L132-L160)
-- [DiffController.java:64-76](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L64-L76)
+**图表来源**
+- [DiffView.vue:133-161](file://schemasync-frontend/src/views/DiffView.vue#L133-L161)
+- [DiffController.java:65-77](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L65-L77)
 - [SchemaDiffService.java:77-104](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L77-L104)
 - [SchemaDictionaryParser.java:42-81](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L42-L81)
 - [DefaultSchemaDiffer.java:24-52](file://schemasync-backend/src/main/java/com/schemasync/differ/DefaultSchemaDiffer.java#L24-L52)
@@ -136,18 +146,34 @@ F->>F : 渲染统计卡片
   - 使用两个独立的el-upload组件分别接收旧/新版本文件，限制数量为1，accept为Excel扩展名
   - 通过arrayBuffer读取文件内容并缓存，避免重复IO
   - 未实现拖拽上传；如需多文件拖拽，可在模板中启用drag属性并在@change中处理多个file对象
+- **更新**：数据库类型选择器
+  - 新增"GaussDB (PG模式)"选项，值为`gaussdb_pg`
+  - 支持四种数据库类型：MySQL、GaussDB (MySQL兼容模式)、GaussDB (Oracle兼容模式)、GaussDB (PG模式)
+  - 数据库类型参数在DDL生成和差异导出时传递给后端
 - 对比请求
   - 将两个文件封装为FormData，POST至/api/diff/summary获取统计摘要
   - 失败时通过ElMessage提示，成功则渲染统计卡片
 - 下载差异报告
   - 调用/api/diff，设置exportFormat=excel，解析响应头Content-Disposition中的文件名后触发浏览器下载
+  - **更新**：传递databaseType参数以支持不同数据库类型的DDL生成
 - 生成DDL脚本
   - 调用/api/diff/ddl，携带数据库类型参数，下载SQL文件
+  - **更新**：支持GaussDB PG模式的PostgreSQL方言DDL生成
 - 标签映射
   - 提供变更类型与严重级别的标签映射函数，便于UI渲染
 
+**更新** 数据库类型选择器现已支持GaussDB PG模式，允许用户指定PostgreSQL方言进行DDL语句生成。
+
 章节来源
-- [DiffView.vue:1-313](file://schemasync-frontend/src/views/DiffView.vue#L1-L313)
+- [DiffView.vue:1-315](file://schemasync-frontend/src/views/DiffView.vue#L1-L315)
+
+### 前端：GenerateView.vue
+- 全量DDL生成界面，支持单文件上传和数据库类型选择
+- **更新**：同样支持GaussDB PG模式选项
+- 提供DDL脚本预览和下载功能
+
+章节来源
+- [GenerateView.vue:1-154](file://schemasync-frontend/src/views/GenerateView.vue#L1-L154)
 
 ### 前端：DiffDetail.vue
 - Props与事件
@@ -155,7 +181,7 @@ F->>F : 渲染统计卡片
   - emits：back事件，用于返回上一级视图
 - 展示逻辑
   - 使用computed按tableName对changes分组，形成树形层级（表→字段/索引/外键变更）
-  - 变更类型与严重级别通过标签显示，BREAKING标记为“破坏性”
+  - 变更类型与严重级别通过标签显示，BREAKING标记为"破坏性"
   - details字段若为对象，过滤oldDefinition后拼接为可读文本
 - 交互
   - el-collapse按表展开/收起，配合小尺寸表格提升信息密度
@@ -172,7 +198,7 @@ F->>F : 渲染统计卡片
   - 统一设置Content-Type为二进制流，并通过Content-Disposition指定文件名
 
 章节来源
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
 
 ### 后端：SchemaDiffService.java
 - 文件解析
@@ -181,13 +207,24 @@ F->>F : 渲染统计卡片
   - 解析旧/新版本SchemaDictionary后，委托DefaultSchemaDiffer执行compare
 - 格式化与导出
   - formatDiff/formatDiff(diff,format,newDict)：Excel走简单表格导出，JSON走JsonFormatter
-- DDL生成
-  - generateDdlFromDiff：解析→对比→按数据库类型生成差异化DDL（MySQL/GaussDB MySQL兼容/GaussDB Oracle兼容）
+- **更新**：DDL生成
+  - generateDdlFromDiff：解析→对比→按数据库类型生成差异化DDL（MySQL/GaussDB MySQL兼容/GaussDB Oracle兼容/**GaussDB PG模式**）
   - 针对新增/修改字段、索引增删改、表增删等场景生成具体SQL片段
+  - **新增**：完整的GaussDB PG模式支持，包括：
+    - `generateGaussDbPgStyleDiffDdl()`：PG风格差异化DDL生成
+    - `generateGaussDbPgDdlForChange()`：单条变更的PG风格DDL生成
+    - `generateGaussDbPgCreateTableForDiff()`：PG风格的CREATE TABLE语句
+    - `generateGaussDbPgColumnDefForDiff()`：PG风格的字段定义转换
+    - `generateGaussDbPgAddColumnSql()`：PG风格的ADD COLUMN语句
+    - `generateGaussDbPgModifyColumnSql()`：PG风格的ALTER COLUMN语句
+    - `generateGaussDbPgCreateIndexSql()`：PG风格的索引创建语句
+    - `convertToPgTypeForDiff()`：数据类型转换为PostgreSQL标准类型
   - 删除类操作默认注释，需人工确认后执行
 
+**更新** 新增了完整的GaussDB PG模式支持，实现了PostgreSQL方言的完整DDL生成逻辑，包括数据类型转换、约束处理、注释管理等特性。
+
 章节来源
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 
 ### 后端：DefaultSchemaDiffer.java
 - 对比维度
@@ -239,6 +276,14 @@ class SchemaDiffService {
 +compareFiles()
 +compareAndFormat()
 +generateDdlFromDiff()
++generateGaussDbPgStyleDiffDdl()
++generateGaussDbPgDdlForChange()
++generateGaussDbPgCreateTableForDiff()
++generateGaussDbPgColumnDefForDiff()
++generateGaussDbPgAddColumnSql()
++generateGaussDbPgModifyColumnSql()
++generateGaussDbPgCreateIndexSql()
++convertToPgTypeForDiff()
 }
 class DefaultSchemaDiffer {
 +compare()
@@ -275,9 +320,9 @@ SchemaChange --> ChangeType : "引用"
 SchemaChange --> Severity : "引用"
 ```
 
-图表来源
-- [DiffController.java:1-108](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L108)
-- [SchemaDiffService.java:1-800](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L800)
+**图表来源**
+- [DiffController.java:1-109](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L1-L109)
+- [SchemaDiffService.java:1-1542](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L1-L1542)
 - [DefaultSchemaDiffer.java:1-512](file://schemasync-backend/src/main/java/com/schemasync/differ/DefaultSchemaDiffer.java#L1-L512)
 - [SchemaDictionaryParser.java:1-330](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L1-L330)
 - [JsonFormatter.java:1-119](file://schemasync-backend/src/main/java/com/schemasync/formatter/JsonFormatter.java#L1-L119)
@@ -313,9 +358,9 @@ SVC-->>API : SchemaDiff
 API-->>FE : JSON
 ```
 
-图表来源
-- [DiffView.vue:132-160](file://schemasync-frontend/src/views/DiffView.vue#L132-L160)
-- [DiffController.java:64-76](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L64-L76)
+**图表来源**
+- [DiffView.vue:133-161](file://schemasync-frontend/src/views/DiffView.vue#L133-L161)
+- [DiffController.java:65-77](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L65-L77)
 - [SchemaDiffService.java:77-104](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L77-L104)
 - [SchemaDictionaryParser.java:42-81](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDictionaryParser.java#L42-L81)
 - [JsonFormatter.java:61-68](file://schemasync-backend/src/main/java/com/schemasync/formatter/JsonFormatter.java#L61-L68)
@@ -355,7 +400,7 @@ CommentChanged --> |否| End(["结束"])
 Merge --> End
 ```
 
-图表来源
+**图表来源**
 - [DefaultSchemaDiffer.java:219-316](file://schemasync-backend/src/main/java/com/schemasync/differ/DefaultSchemaDiffer.java#L219-L316)
 
 ### 子组件复用机制（DiffDetail.vue）
@@ -364,7 +409,7 @@ Merge --> End
 - 事件通信
   - emits：back，用于父组件切换视图
 - 动态渲染
-  - computed groupedChanges：按tableName分组，形成“表→变更项”的树形结构
+  - computed groupedChanges：按tableName分组，形成"表→变更项"的树形结构
   - 标签颜色与文案映射：getChangeTypeLabel/getChangeTypeColor
   - 详情格式化：formatDetails过滤oldDefinition并拼接为字符串
 
@@ -393,9 +438,10 @@ Merge --> End
   - 对于频繁对比同一组文件的场景，可在Redis中缓存SchemaDiff摘要
 - 导出性能
   - 差异报告导出使用简单表格路径，避免复杂样式；必要时分页或分批写入
-- 可扩展性
+- **更新**：可扩展性
   - 新增数据库类型：在SchemaDiffService.generateDdlForChangedTables分支中添加对应生成逻辑
   - 新增变更维度：在DefaultSchemaDiffer中扩展对比方法并更新统计
+  - **新增**：GaussDB PG模式已完整实现，支持PostgreSQL方言的所有主要特性
 
 [本节为通用指导，不直接引用具体行号]
 
@@ -404,6 +450,7 @@ Merge --> End
   - 文件为空或未选择：后端抛出运行时异常，前端捕获并提示
   - 解析失败（Excel/JSON）：日志记录堆栈，返回统一错误消息
   - 下载失败：检查响应状态码与Content-Disposition头部，确认blob大小是否为0
+  - **新增**：GaussDB PG模式相关问题：检查数据类型转换是否正确，确保PostgreSQL语法兼容性
 - 日志与调试
   - 后端使用SLF4J记录关键步骤（解析、对比、格式化、DDL生成）
   - 前端通过console.error与ElMessage反馈错误信息
@@ -411,11 +458,12 @@ Merge --> End
   - 确认上传文件格式与扩展名匹配
   - 确认服务端接口路径与参数名称一致
   - 确认浏览器允许跨域与下载行为
+  - **新增**：确认选择的数据库类型与实际目标数据库匹配
 
 章节来源
-- [DiffController.java:31-62](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L31-L62)
+- [DiffController.java:31-63](file://schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java#L31-L63)
 - [SchemaDiffService.java:97-104](file://schemasync-backend/src/main/java/com/schemasync/service/SchemaDiffService.java#L97-L104)
-- [DiffView.vue:149-160](file://schemasync-frontend/src/views/DiffView.vue#L149-L160)
+- [DiffView.vue:149-161](file://schemasync-frontend/src/views/DiffView.vue#L149-L161)
 
 ## 结论
 DiffView版本差异对比页面实现了从前端上传、后端解析与对比、到结果可视化与DDL生成的完整链路。当前实现已具备：
@@ -423,9 +471,13 @@ DiffView版本差异对比页面实现了从前端上传、后端解析与对比
 - 差异类型与破坏性变更的高亮标识
 - 按表分组的树形展示（DiffDetail）
 - 差异报告下载与DDL脚本生成
+- **新增**：完整的GaussDB PG模式支持，提供PostgreSQL方言的DDL生成能力
+
+**更新** 系统现已支持四种数据库类型：MySQL、GaussDB MySQL兼容模式、GaussDB Oracle兼容模式和GaussDB PG模式。其中GaussDB PG模式提供了完整的PostgreSQL方言支持，包括数据类型转换、约束管理、注释处理等特性。
 
 建议在后续迭代中补充：
 - 多文件拖拽上传与批量处理
 - 更完善的JSON格式校验与大文件流式处理
 - 对比结果缓存与增量对比能力
 - 更丰富的影响范围评估与变更摘要生成
+- **新增**：针对不同数据库类型的测试用例和兼容性验证

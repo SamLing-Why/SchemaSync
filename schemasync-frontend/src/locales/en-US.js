@@ -143,7 +143,7 @@ export default {
     noScript: 'Please generate script first'
   },
   footer: {
-    copyright: 'SchemaSync v1.0.4 © 2026',
+    copyright: 'SchemaSync v1.0.6 © 2026',
     poweredBy: 'Powered by Spring Boot + Vue 3'
   }
 }
