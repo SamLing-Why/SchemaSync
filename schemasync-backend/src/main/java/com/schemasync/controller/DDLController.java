@@ -1,6 +1,7 @@
 package com.schemasync.controller;
 
 import com.schemasync.service.DdlGeneratorService;
+import com.schemasync.service.SchemaValidatorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 /**
  * DDL生成控制器
@@ -28,6 +30,9 @@ public class DdlController {
     
     @Autowired
     private DdlGeneratorService ddlGeneratorService;
+    
+    @Autowired
+    private SchemaValidatorService schemaValidatorService;
     
     @PostMapping("/generate")
     @Operation(summary = "生成全量DDL脚本", description = "基于数据字典文件生成全量DDL")
@@ -100,6 +105,37 @@ public class DdlController {
                     .body(ddlBytes);
         } catch (Exception e) {
             throw new RuntimeException("生成DDL失败: " + e.getMessage(), e);
+        }
+    }
+    
+    @PostMapping("/validate")
+    @Operation(summary = "校验数据字典文件", description = "校验上传的数据字典文件质量，返回校验结果")
+    public ResponseEntity<byte[]> validateDictionary(
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "excel") String fileType) {
+        try (InputStream inputStream = file.getInputStream()) {
+            List<SchemaValidatorService.ValidationResult> results = 
+                    schemaValidatorService.validate(inputStream, fileType);
+            
+            // 导出为Excel
+            byte[] excelBytes = schemaValidatorService.exportResultsToExcel(results);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            
+            // 生成文件名: validation_yyyyMMddHHmmss_时间戳.xlsx
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+            String dateTime = sdf.format(new Date());
+            String downloadName = "validation_" + dateTime + "_" + System.currentTimeMillis() + ".xlsx";
+            
+            headers.setContentDispositionFormData("attachment", downloadName);
+            headers.setContentLength(excelBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("校验失败: " + e.getMessage(), e);
         }
     }
 }

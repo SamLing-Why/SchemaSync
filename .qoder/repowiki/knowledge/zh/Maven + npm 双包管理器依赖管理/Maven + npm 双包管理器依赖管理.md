@@ -1,3 +1,16 @@
+---
+kind: dependency_management
+name: Maven + npm 双包管理器依赖管理
+category: dependency_management
+scope:
+    - '**'
+source_files:
+    - schemasync-backend/pom.xml
+    - schemasync-frontend/package.json
+    - schemasync-frontend/package-lock.json
+    - deploy/schemasync_1.0.3.jar
+---
+
 ## 1. 使用的系统/方法
 - 后端（Java）：使用 Maven 作为构建与依赖管理工具，基于 spring-boot-starter-parent 2.7.18 作为父 POM，通过 properties 集中声明第三方库版本。
 - 前端（Vue3）：使用 npm + Vite，通过 package.json 声明运行时与开发时依赖，并通过 package-lock.json 锁定精确版本。

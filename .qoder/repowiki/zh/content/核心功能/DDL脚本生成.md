@@ -17,6 +17,14 @@
 - [MySQLDDLGeneratorTest.java](file://schemasync-backend/src/test/java/com/schemasync/generator/MySQLDDLGeneratorTest.java)
 </cite>
 
+## 更新摘要
+**所做更改**   
+- 增强了GaussDB Oracle和PostgreSQL模式的索引生成功能
+- 新增generateGaussDbOracleCreateIndex方法用于Oracle模式下的独立CREATE INDEX语句生成
+- 新增generatePgCreateIndex方法用于标准PostgreSQL CREATE INDEX语句生成
+- 两个实现都包含适当的过滤逻辑以避免重复索引生成
+- 版本从1.0.4升级到1.0.6
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -34,7 +42,7 @@
 14. [结论](#结论)
 
 ## 简介
-本章节面向“全量DDL脚本生成”能力，覆盖自动变更SQL生成机制、回滚脚本创建、事务控制支持、接口设计、具体实现、配置选项、生成流程、脚本语法规范、安全保护机制、执行策略、不同数据库类型DDL差异、约束处理规则、索引重建逻辑、脚本验证方法、执行顺序建议与回滚保障措施。文档同时提供API调用示例与前端界面操作指南，帮助开发者快速集成与使用。
+本章节面向"全量DDL脚本生成"能力，覆盖自动变更SQL生成机制、回滚脚本创建、事务控制支持、接口设计、具体实现、配置选项、生成流程、脚本语法规范、安全保护机制、执行策略、不同数据库类型DDL差异、约束处理规则、索引重建逻辑、脚本验证方法、执行顺序建议与回滚保障措施。文档同时提供API调用示例与前端界面操作指南，帮助开发者快速集成与使用。
 
 ## 项目结构
 后端采用分层架构：控制器暴露REST API，服务层编排解析与生成逻辑，生成器负责按数据库方言输出DDL；模型层承载数据字典与差异对象；前端提供可视化上传、预览与下载能力。
@@ -94,7 +102,7 @@ GEN_MYSQL --> OPT
 - DDLGenerator接口：定义生成正向DDL、回滚DDL与数据库类型标识的契约。
 - MySQLDDLGenerator：基于差异对象生成MySQL风格变更脚本，包含事务包裹、破坏性变更注释、回滚脚本生成等。
 - GenerationOptions：生成选项，包括是否包含回滚、是否注释破坏性变更、是否启用事务、版本信息等。
-- DdlGeneratorService：从数据字典（Excel/JSON）生成全量DDL，支持MySQL与GaussDB Oracle兼容模式。
+- DdlGeneratorService：从数据字典（Excel/JSON）生成全量DDL，支持MySQL、GaussDB Oracle兼容模式和GaussDB PG模式。
 - DdlController：对外暴露生成、预览、下载三个接口。
 - 模型层：SchemaDiff/SchemaChange/ChangeType/Severity描述差异；TableDefinition/ColumnDefinition描述表结构与字段。
 
@@ -130,6 +138,9 @@ S->>S : generateMySqlStyleDdl(dictionary)
 S-->>C : 返回DDL字符串
 else 选择GaussDB Oracle
 S->>S : generateGaussDbOracleStyleDdl(dictionary)
+S-->>C : 返回DDL字符串
+else 选择GaussDB PG
+S->>S : generateGaussDbPgStyleDdl(dictionary)
 S-->>C : 返回DDL字符串
 end
 C-->>FE : 文本或二进制响应
@@ -206,8 +217,10 @@ Commit --> Done
 ### DdlGeneratorService（全量DDL生成）
 - 输入：Excel或JSON格式的数据字典文件流。
 - 解析：通过SchemaDictionaryParser解析为SchemaDictionary。
-- 路由：根据databaseType选择MySQL风格或GaussDB Oracle风格生成。
+- 路由：根据databaseType选择MySQL风格、GaussDB Oracle风格或GaussDB PG风格生成。
 - 输出：完整DDL SQL字符串，包含表、视图、索引、外键、注释等。
+
+**更新** 新增了GaussDB PG模式的支持，提供了完整的PostgreSQL标准SQL语法兼容性。
 
 ```mermaid
 classDiagram
@@ -218,9 +231,11 @@ class DdlGeneratorService {
 +generateCreateView(view) String
 -generateMySqlStyleDdl(dictionary) String
 -generateGaussDbOracleStyleDdl(dictionary) String
+-generateGaussDbPgStyleDdl(dictionary) String
 -generateIndex(index, columnNameMap) String
 -generateForeignKey(fk, columnNameMap) String
 -convertToOracleType(mysqlType) String
+-convertToPgType(dataType) String
 }
 class TableDefinition
 class ColumnDefinition
@@ -347,9 +362,48 @@ Service --> Dict["TableDefinition/ColumnDefinition/IndexDefinition/ForeignKeyDef
   - 数据类型转换（如VARCHAR->VARCHAR2，INT->NUMBER，TEXT->CLOB等）。
   - 索引通常单独创建，建表内仅保留注释提示。
   - ON UPDATE CASCADE不支持，需手动处理。
+- **更新** GaussDB PG模式（PostgreSQL标准模式）：
+  - 遵循PostgreSQL标准SQL语法，兼容性最好。
+  - 字段名保持原始大小写，不使用反引号。
+  - 数据类型转换（如VARCHAR->VARCHAR，INT->INTEGER，TEXT->TEXT等）。
+  - 索引在表外单独创建，使用标准CREATE INDEX语法。
+  - 支持完整的PostgreSQL特性，包括JSONB、BYTEA等类型。
 
 章节来源
 - [DdlGeneratorService.java](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java)
+
+### 增强索引生成功能详解
+
+**新增功能** 系统现在为GaussDB Oracle和PostgreSQL模式提供了专门的索引生成方法，确保正确的语法和命名约定。
+
+#### GaussDB Oracle模式索引生成
+- 方法：`generateGaussDbOracleCreateIndex(String tableName, IndexDefinition index, Map<String, String> columnNameMap)`
+- 特点：
+  - 生成独立的CREATE INDEX语句
+  - 字段名自动转换为大写
+  - 支持字段名映射（旧名->新名）
+  - 自动过滤主键索引避免重复生成
+
+#### PostgreSQL模式索引生成  
+- 方法：`generatePgCreateIndex(String tableName, IndexDefinition index, Map<String, String> columnNameMap)`
+- 特点：
+  - 生成标准PostgreSQL CREATE INDEX语句
+  - 保持字段名原始大小写
+  - 支持字段名映射
+  - 自动过滤主键索引避免重复生成
+
+#### 索引过滤逻辑
+两个实现都包含相同的过滤逻辑来避免重复索引生成：
+```java
+if (!"PRIMARY".equalsIgnoreCase(idx.getIndexType()) 
+    && !"PRIMARY".equalsIgnoreCase(idx.getIndexName())) {
+    // 生成索引语句
+}
+```
+
+**图表来源**
+- [DdlGeneratorService.java:484-508](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L484-L508)
+- [DdlGeneratorService.java:904-928](file://schemasync-backend/src/main/java/com/schemasync/service/DdlGeneratorService.java#L904-L928)
 
 ## 验证方法与回滚保障
 - 验证方法：
@@ -370,22 +424,26 @@ Service --> Dict["TableDefinition/ColumnDefinition/IndexDefinition/ForeignKeyDef
 ## API调用示例
 - 预览DDL
   - 请求：POST /api/ddl/preview
-  - 参数：file(MultipartFile), fileType=excel, databaseType=mysql|gaussdb_mysql|gaussdb_oracle
+  - 参数：file(MultipartFile), fileType=excel, databaseType=mysql|gaussdb_mysql|gaussdb_oracle|gaussdb_pg
   - 响应：文本DDL
 - 下载DDL
   - 请求：POST /api/ddl/download
   - 参数：同上
   - 响应：二进制.sql文件
 
+**更新** 新增了gaussdb_pg数据库类型支持。
+
 章节来源
 - [DdlController.java](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java)
 
 ## 前端界面操作指南
-- 打开“全量DDL脚本生成”页面。
+- 打开"全量DDL脚本生成"页面。
 - 选择Excel数据字典文件。
-- 选择数据库类型（MySQL/GaussDB MySQL/GaussDB Oracle）。
-- 点击“生成DDL脚本”，在预览区查看SQL。
-- 点击“下载SQL文件”保存本地。
+- 选择数据库类型（MySQL/GaussDB MySQL/GaussDB Oracle/GaussDB PG）。
+- 点击"生成DDL脚本"，在预览区查看SQL。
+- 点击"下载SQL文件"保存本地。
+
+**更新** 新增了GaussDB PG模式的选择选项。
 
 章节来源
 - [GenerateView.vue](file://schemasync-frontend/src/views/GenerateView.vue)
@@ -402,6 +460,10 @@ Service --> Dict["TableDefinition/ColumnDefinition/IndexDefinition/ForeignKeyDef
   - 检查commentBreakingChanges配置，必要时手动取消注释。
 - 事务相关错误：
   - 若数据库不支持或事务过大，关闭useTransaction。
+- **新增** 索引生成问题：
+  - 检查indexType和indexName字段是否正确设置为'PRIMARY'。
+  - 确认字段名映射配置正确。
+  - 验证数据库类型参数与实际使用的生成方法匹配。
 
 章节来源
 - [DdlController.java](file://schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java)
@@ -409,4 +471,4 @@ Service --> Dict["TableDefinition/ColumnDefinition/IndexDefinition/ForeignKeyDef
 - [MySQLDDLGenerator.java](file://schemasync-backend/src/main/java/com/schemasync/generator/MySQLDDLGenerator.java)
 
 ## 结论
-本方案通过接口抽象与具体实现分离，实现了可扩展的DDL生成能力；结合事务控制与破坏性变更保护，提升了安全性与可维护性；同时提供MySQL与GaussDB Oracle两种风格的生成策略，满足多数据库场景需求。配合前端界面与API，形成完整的端到端解决方案。
+本方案通过接口抽象与具体实现分离，实现了可扩展的DDL生成能力；结合事务控制与破坏性变更保护，提升了安全性与可维护性；同时提供MySQL、GaussDB Oracle和GaussDB PG三种风格的生成策略，满足多数据库场景需求。配合前端界面与API，形成完整的端到端解决方案。**最新版本1.0.6增强了索引生成功能，特别针对GaussDB Oracle和PostgreSQL模式提供了优化的索引创建语句生成。**

@@ -1,3 +1,20 @@
+---
+kind: build_system
+name: SchemaSync 单体构建与部署体系
+category: build_system
+scope:
+    - '**'
+source_files:
+    - schemasync-backend/pom.xml
+    - build.sh
+    - build.bat
+    - deploy/start.sh
+    - deploy/start.bat
+    - deploy/application.yml
+    - schemasync-frontend/package.json
+    - BUILD.md
+---
+
 ## 构建系统概览
 
 SchemaSync 采用 Maven 单仓聚合的构建方式，通过 Maven 插件在 Java 构建流程中自动完成前端 Vue3 应用的打包，最终输出一个包含前后端资源的 Spring Boot JAR 包。

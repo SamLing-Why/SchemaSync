@@ -1,3 +1,21 @@
+---
+kind: configuration_system
+name: SchemaSync 配置体系：Spring Boot Profile + JSON 数据源持久化
+category: configuration_system
+scope:
+    - '**'
+source_files:
+    - schemasync-backend/src/main/resources/application.yml
+    - schemasync-backend/src/main/resources/application-dev.yml
+    - schemasync-backend/src/main/resources/application-prod.yml
+    - schemasync-backend/src/main/resources/schemasync-config.json
+    - schemasync-backend/src/main/java/com/schemasync/service/ConfigService.java
+    - schemasync-backend/src/main/java/com/schemasync/controller/ConfigController.java
+    - schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java
+    - schemasync-backend/src/main/java/com/schemasync/util/CryptoUtil.java
+    - deploy/start.sh
+---
+
 ## 1. 系统概览
 
 SchemaSync 采用**分层配置策略**，将“应用运行期配置”与“业务运行时配置”解耦：

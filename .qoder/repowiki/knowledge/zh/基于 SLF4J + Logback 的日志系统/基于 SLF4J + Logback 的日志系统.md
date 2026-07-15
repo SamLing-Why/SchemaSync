@@ -1,3 +1,16 @@
+---
+kind: logging_system
+name: 基于 SLF4J + Logback 的日志系统
+category: logging_system
+scope:
+    - '**'
+source_files:
+    - schemasync-backend/pom.xml
+    - schemasync-backend/src/main/resources/application.yml
+    - schemasync-backend/src/main/resources/application-dev.yml
+    - schemasync-backend/src/main/resources/application-prod.yml
+---
+
 ## 1. 系统概述
 后端采用 Spring Boot 默认的 **SLF4J + Logback** 日志体系，通过 `spring-boot-starter-logging` 引入，配合 `application.yml` 及多环境 profile 文件进行集中配置。前端（Vue3）未集成专用日志框架，仅依赖浏览器控制台输出。
 

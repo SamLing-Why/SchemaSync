@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: SchemaSync 数据字典管理工具（前后端聚合工程）
+title: SchemaSync 多数据库结构同步与字典管理工具
 scope:
     - README.md
     - BUILD.md

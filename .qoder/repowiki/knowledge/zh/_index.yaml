@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-07-13T06:36:56Z"
+exported_at: "2026-07-14T10:20:02Z"
 modules:
     "":
-        dir_name: SchemaSync 数据字典管理工具（前后端聚合工程）
-        title: SchemaSync 数据字典管理工具（前后端聚合工程）
+        dir_name: SchemaSync 多数据库结构同步与字典管理工具
+        title: SchemaSync 多数据库结构同步与字典管理工具
         scope:
             - README.md
             - BUILD.md
@@ -122,85 +122,6 @@ modules:
         children:
             - schemasync_backend
             - schemasync_frontend
-        depends_on: []
-        related_to: []
-    build_system:
-        dir_name: SchemaSync 单体构建与部署体系
-        title: SchemaSync 单体构建与部署体系
-        scope: []
-        source_files:
-            - schemasync-backend/pom.xml
-            - build.sh
-            - build.bat
-            - deploy/start.sh
-            - deploy/start.bat
-            - deploy/application.yml
-            - schemasync-frontend/package.json
-            - BUILD.md
-        children: []
-        depends_on: []
-        related_to: []
-    configuration_system:
-        dir_name: SchemaSync 配置体系：Spring Boot Profile + JSON 数据源持久化
-        title: SchemaSync 配置体系：Spring Boot Profile + JSON 数据源持久化
-        scope: []
-        source_files:
-            - schemasync-backend/src/main/resources/application.yml
-            - schemasync-backend/src/main/resources/application-dev.yml
-            - schemasync-backend/src/main/resources/application-prod.yml
-            - schemasync-backend/src/main/resources/schemasync-config.json
-            - schemasync-backend/src/main/java/com/schemasync/service/ConfigService.java
-            - schemasync-backend/src/main/java/com/schemasync/controller/ConfigController.java
-            - schemasync-backend/src/main/java/com/schemasync/model/config/DataSourceConfig.java
-            - schemasync-backend/src/main/java/com/schemasync/util/CryptoUtil.java
-            - deploy/start.sh
-        children: []
-        depends_on: []
-        related_to: []
-    dependency_management:
-        dir_name: Maven + npm 双包管理器依赖管理
-        title: Maven + npm 双包管理器依赖管理
-        scope: []
-        source_files:
-            - schemasync-backend/pom.xml
-            - schemasync-frontend/package.json
-            - schemasync-frontend/package-lock.json
-            - deploy/schemasync_1.0.3.jar
-        children: []
-        depends_on: []
-        related_to: []
-    error_handling:
-        dir_name: Spring Boot 控制器层异常处理（无统一策略）
-        title: Spring Boot 控制器层异常处理（无统一策略）
-        scope: []
-        source_files:
-            - schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java
-            - schemasync-backend/src/main/java/com/schemasync/controller/ExportController.java
-            - schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java
-            - schemasync-backend/src/main/java/com/schemasync/config/WebConfig.java
-        children: []
-        depends_on: []
-        related_to: []
-    frontend_style:
-        dir_name: 前端样式系统：基于 Element Plus 的无自定义样式方案
-        title: 前端样式系统：基于 Element Plus 的无自定义样式方案
-        scope: []
-        source_files:
-            - schemasync-frontend/package.json
-            - schemasync-frontend/vite.config.js
-        children: []
-        depends_on: []
-        related_to: []
-    logging_system:
-        dir_name: 基于 SLF4J + Logback 的日志系统
-        title: 基于 SLF4J + Logback 的日志系统
-        scope: []
-        source_files:
-            - schemasync-backend/pom.xml
-            - schemasync-backend/src/main/resources/application.yml
-            - schemasync-backend/src/main/resources/application-dev.yml
-            - schemasync-backend/src/main/resources/application-prod.yml
-        children: []
         depends_on: []
         related_to: []
     schemasync_backend:

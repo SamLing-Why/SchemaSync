@@ -1,3 +1,16 @@
+---
+kind: error_handling
+name: Spring Boot 控制器层异常处理（无统一策略）
+category: error_handling
+scope:
+    - '**'
+source_files:
+    - schemasync-backend/src/main/java/com/schemasync/controller/DdlController.java
+    - schemasync-backend/src/main/java/com/schemasync/controller/ExportController.java
+    - schemasync-backend/src/main/java/com/schemasync/controller/DiffController.java
+    - schemasync-backend/src/main/java/com/schemasync/config/WebConfig.java
+---
+
 该仓库的 SchemaSync 后端基于 Spring Boot，但**未建立统一的错误处理体系**。当前错误处理呈现以下特征：
 
 1. **异常类型分散且不规范**：Controller 中直接抛出 `RuntimeException`、`IllegalArgumentException`、`UnsupportedOperationException` 等原生异常，没有自定义业务异常类或统一的错误码枚举。例如 `DdlController` 在 DDL 生成失败时抛 `RuntimeException("生成DDL失败: ...")`，`ExportController` 对参数校验抛 `IllegalArgumentException`。
